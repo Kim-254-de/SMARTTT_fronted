@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "538465698343",
+    "project_id": "smart-timetable-8f116",
+    "storage_bucket": "smart-timetable-8f116.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:538465698343:android:05cf7b27ddffaae5168402",
+        "android_client_info": {
+          "package_name": "com.nova.smart"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "538465698343-502lohdec6ipbo0p0sou8o2rvhsvinse.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAvXo7yeaDrMtoSq3wKxVPpTnE55X6U8W4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "538465698343-502lohdec6ipbo0p0sou8o2rvhsvinse.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
