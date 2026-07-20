@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../domain/models/timetable_session_model.dart';
 import 'providers/timetable_provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class ScheduleScreen extends ConsumerStatefulWidget {
   const ScheduleScreen({Key? key}) : super(key: key);
@@ -34,18 +34,17 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     });
   }
 
-// icallendar
-Future<void> subscribeCalendar() async {
-  // Replace with your laptop IP when testing on a real phone
-  final uri = Uri.parse(
-    'http://192.168.1.5:8000/api/v1/schedule/calendar.ics',
-  );
+  // iCalendar
+  Future<void> subscribeCalendar() async {
+    final uri = Uri.parse(
+      'http://192.168.1.5:8000/api/v1/schedule/calendar.ics',
+    );
 
-  await launchUrl(
-    uri,
-    mode: LaunchMode.externalApplication,
-  );
-}
+    await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,9 +66,9 @@ Future<void> subscribeCalendar() async {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
           children: [
-             SizedBox(
-               width: double.infinity,
-               child: ElevatedButton.icon(
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
                 onPressed: subscribeCalendar,
                 icon: const Icon(Icons.calendar_month),
                 label: const Text('Subscribe to Calendar'),
@@ -79,12 +78,12 @@ Future<void> subscribeCalendar() async {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
-        ),
-      ),
-    ),
-  ),
+                  ),
+                ),
+              ),
+            ),
 
-  const SizedBox(height: 16),
+            const SizedBox(height: 16),
             if (state.termLabel != null) ...[
               _InfoCard(
                 title: 'Current Term',
