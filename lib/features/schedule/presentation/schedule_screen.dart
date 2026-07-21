@@ -35,6 +35,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   }
 
   // iCalendar
+
  Future<void> subscribeCalendar() async {
   final uri = Uri.parse(
     'https://smarttt-backend-n44z.onrender.com/api/v1/schedule/calendar.ics',
@@ -45,6 +46,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     mode: LaunchMode.externalApplication,
   );
 }
+
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +73,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                 onPressed: subscribeCalendar,
                 icon: const Icon(Icons.calendar_month),
                 label: const Text('Add to Calendar'),
+
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
