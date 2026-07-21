@@ -16,8 +16,8 @@ class SupportScreen extends StatelessWidget {
       scheme: 'mailto',
       path: supportEmail,
       queryParameters: {
-        'subject': 'Smart Timetable Support Request',
-        'body': 'Hi Support Team,\n\nI am writing to request support regarding the Smart Timetable App.\n\n',
+        'subject': 'Smart ClassCatch Support Request',
+        'body': 'Hi Support Team,\n\nI am writing to request support regarding the Smart ClassCatch App.\n\n',
       },
     );
     try {
@@ -94,7 +94,7 @@ class SupportScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Smart Timetable Support Team',
+                              'Smart ClassCatch Support Team',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.getTextSecondary(context),

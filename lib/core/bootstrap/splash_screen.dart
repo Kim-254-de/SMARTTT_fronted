@@ -23,7 +23,7 @@ class SplashScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             const Text(
-              'SMARTTT',
+              'SMART ClassCatch',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 30,

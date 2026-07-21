@@ -52,15 +52,15 @@ class TermsScreen extends StatelessWidget {
 }
 
 const String _termsText = '''
-SMARTTT — Terms & Conditions
+SMART CLASSCATCH — Terms & Conditions
 
 Last updated: 2026-07-03
 
 Introduction
-These Terms & Conditions ("Terms") govern your access to and use of the SMARTTT mobile and desktop application ("App"). By downloading, installing, or using the App you agree to be bound by these Terms. If you do not agree, do not use the App.
+These Terms & Conditions ("Terms") govern your access to and use of the SMART CLASSCATCH mobile and desktop application ("App"). By downloading, installing, or using the App you agree to be bound by these Terms. If you do not agree, do not use the App.
 
 1. Definitions
-- "App": the SMARTTT client applications and web build.
+- "App": the SMART CLASSCATCH client applications and web build.
 - "Service": backend services, APIs, and any hosted components that the App communicates with.
 - "You" / "User": a student or authorized person using the App.
 

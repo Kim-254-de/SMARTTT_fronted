@@ -7,6 +7,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/theme/locale_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/theme/notifications_provider.dart';
+import '../../../notifications/services/fcm_service.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -111,13 +113,25 @@ class ProfileScreen extends ConsumerWidget {
                   themeMode == ThemeMode.dark,
                   (val) => ref.read(themeProvider.notifier).toggleTheme(),
                 ),
-                _buildToggleTile(
-                  context,
-                  Iconsax.notification,
-                  context.tr('Push Notifications'),
-                  true,
-                  (val) {},
-                ),
+                Consumer(
+                builder: (context, ref, _) {
+                final enabled = ref.watch(notificationsEnabledProvider);
+                return _buildToggleTile(
+                context,
+                Iconsax.notification,
+                context.tr('Push Notifications'),
+                enabled,
+                (val) async {
+                await ref.read(notificationsEnabledProvider.notifier).toggle(val);
+                if (val) {
+                await FCMService.registerToken();
+                } else {
+                await FCMService.unregisterToken();
+        }
+      },
+    );
+  },
+),
                 // Language selector — shows a bottom sheet with English/Swahili
                 _buildLanguageTile(
                   context,
@@ -179,7 +193,7 @@ class ProfileScreen extends ConsumerWidget {
             Center(
               child: Column(
                 children: [
-                  Text('Smart Timetable v1.0.0',
+                  Text('Smart ClassCatch v1.0.0',
                       style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12)),
                   const SizedBox(height: 4),
                   Text('tharaka.ac.ke',

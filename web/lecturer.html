@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMART ClassCatch — Lecturer Portal</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --surface-2: #f0f2f5;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --primary: #1a3a8f;
+    --primary-light: #e8eef9;
+    --accent: #f5a623;
+    --accent-light: #fdf3e3;
+    --success: #28a745;
+    --success-bg: #d4edda;
+    --danger: #dc3545;
+    --danger-bg: #f8d7da;
+    --warning: #f0ad4e;
+    --text-primary: #1a1f2e;
+    --text-secondary: #5c6478;
+    --text-muted: #94a3b8;
+    --radius: 12px;
+    --shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── Nav ── */
+  nav {
+    background: var(--primary);
+    color: white;
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(26,58,143,0.3);
+  }
+  .nav-brand { font-size: 16px; font-weight: 700; letter-spacing: 0.3px; }
+  .nav-brand span { color: var(--accent); }
+  .nav-user { font-size: 13px; opacity: 0.85; display: flex; align-items: center; gap: 12px; }
+  .logout-btn {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: white;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .logout-btn:hover { background: rgba(255,255,255,0.25); }
+
+  /* ── Layout ── */
+  .container { max-width: 960px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  /* ── Auth pages ── */
+  .auth-wrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--primary) 0%, #2952c4 100%);
+    padding: 24px;
+  }
+  .auth-card {
+    background: white;
+    border-radius: 20px;
+    padding: 36px 32px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  }
+  .auth-logo {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .auth-logo h1 { font-size: 22px; color: var(--primary); font-weight: 800; }
+  .auth-logo p { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
+  .auth-tabs {
+    display: flex;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .auth-tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+  }
+  .auth-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+  /* ── Forms ── */
+  .form-group { margin-bottom: 16px; }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+  input, select, textarea {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid var(--border-strong);
+    border-radius: 10px;
+    font-size: 14px;
+    color: var(--text-primary);
+    background: var(--surface);
+    transition: border-color 0.2s;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(26,58,143,0.1);
+  }
+  textarea { resize: vertical; min-height: 80px; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 11px 20px;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary { background: var(--primary); color: white; width: 100%; }
+  .btn-primary:hover { background: #2952c4; }
+  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-accent { background: var(--accent); color: white; }
+  .btn-accent:hover { background: #e09518; }
+  .btn-outline {
+    background: transparent;
+    border: 1.5px solid var(--border-strong);
+    color: var(--text-primary);
+  }
+  .btn-outline:hover { background: var(--surface-2); }
+  .btn-sm { padding: 7px 14px; font-size: 12.5px; }
+  .btn-danger { background: var(--danger); color: white; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .card-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+
+  /* ── Stats strip ── */
+  .stats-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+  .stat-value { font-size: 28px; font-weight: 800; color: var(--primary); }
+  .stat-label { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* ── Timetable grid ── */
+  .day-label {
+    display: inline-block;
+    padding: 3px 10px;
+    background: var(--primary-light);
+    color: var(--primary);
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .slot-card {
+    background: var(--primary-light);
+    border-left: 4px solid var(--primary);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .slot-card:hover { background: #dce6f7; transform: translateX(2px); }
+  .slot-card.accent { background: var(--accent-light); border-left-color: var(--accent); }
+  .slot-title { font-weight: 700; font-size: 14px; }
+  .slot-meta { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
+  .slot-time { font-size: 12px; font-weight: 600; color: var(--primary); }
+
+  /* ── Table ── */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--text-secondary); font-weight: 600; padding: 8px 10px; border-bottom: 2px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface-2); }
+
+  /* ── Status messages ── */
+  .alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+  .alert-success { background: var(--success-bg); color: var(--success); }
+  .alert-error { background: var(--danger-bg); color: var(--danger); }
+  .alert-warning { background: #fff3cd; color: #856404; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+  }
+  .modal {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  }
+  .modal h3 { font-size: 17px; margin-bottom: 16px; }
+
+  /* ── Misc ── */
+  .hidden { display: none; }
+  .muted { color: var(--text-muted); font-size: 12px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 600; }
+  .badge-primary { background: var(--primary-light); color: var(--primary); }
+  .badge-accent { background: var(--accent-light); color: #c47d0e; }
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+  .empty-state svg { margin-bottom: 12px; opacity: 0.4; }
+  .section-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border-strong); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- ════════════════ AUTH VIEW ════════════════ -->
+<div id="authView">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <h1>SMART<span>ClassCatch</span></h1>
+        <p>Tharaka University — Lecturer Portal</p>
+      </div>
+
+      <div class="auth-tabs">
+        <div class="auth-tab active" onclick="showTab('login')">Sign In</div>
+        <div class="auth-tab" onclick="showTab('register')">Register</div>
+      </div>
+
+      <!-- Login form -->
+      <div id="loginForm">
+        <div id="loginAlert"></div>
+        <div class="form-group">
+          <label>Staff ID</label>
+          <input type="text" id="loginIdentifier" placeholder="TUN/ST/001">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="loginPassword" placeholder="••••••••"
+            onkeydown="if(event.key==='Enter') doLogin()">
+        </div>
+        <button class="btn btn-primary" onclick="doLogin()" id="loginBtn">Sign In</button>
+      </div>
+
+      <!-- Register form -->
+      <div id="registerForm" class="hidden">
+        <div id="registerAlert"></div>
+        <div class="form-group">
+          <label>Staff ID <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="regStaffId" placeholder="e.g. TUN/ST/001">
+          <div class="muted" style="margin-top:4px">Must match university records</div>
+        </div>
+        <div class="form-group">
+          <label>Full Name <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="regName" placeholder="Muriithi Njoroge">
+        </div>
+        <div class="form-group">
+          <label>School Email <span style="color:var(--danger)">*</span></label>
+          <input type="email" id="regEmail" placeholder="muriithi.njoroge@tharaka.ac.ke">
+        </div>
+        <div class="form-group">
+          <label>Department</label>
+          <select id="regDepartment">
+            <option value="">— Select department (optional) —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Password <span style="color:var(--danger)">*</span></label>
+          <input type="password" id="regPassword" placeholder="Min. 6 characters">
+        </div>
+        <div class="form-group">
+          <label>Confirm Password <span style="color:var(--danger)">*</span></label>
+          <input type="password" id="regConfirm" placeholder="Repeat password">
+        </div>
+        <button class="btn btn-primary" onclick="doRegister()" id="registerBtn">Create Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ MAIN VIEW ════════════════ -->
+<div id="mainView" class="hidden">
+
+  <nav>
+    <div class="nav-brand">SMART<span>ClassCatch</span> Lecturer</div>
+    <div class="nav-user">
+      <span id="navName"></span>
+      <button class="logout-btn" onclick="doLogout()">Sign out</button>
+    </div>
+  </nav>
+
+  <div class="container">
+
+    <!-- Stats strip -->
+    <div class="stats-strip">
+      <div class="stat-card">
+        <div class="stat-value" id="statUnits">—</div>
+        <div class="stat-label">Units this term</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statSessions">—</div>
+        <div class="stat-label">Weekly sessions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statStudents">—</div>
+        <div class="stat-label">Total students</div>
+      </div>
+    </div>
+
+    <!-- My timetable card -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">My Timetable</span>
+        <span id="termBadge" class="badge badge-primary"></span>
+      </div>
+      <div id="timetableContent">
+        <div class="empty-state">
+          <div class="spinner"></div>
+          <div style="margin-top:12px">Loading your timetable…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Send notification card -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Send Notification to Students</span>
+      </div>
+      <div id="notifAlert"></div>
+
+      <div class="form-group">
+        <label>Unit</label>
+        <select id="notifUnit" onchange="loadStudentsForUnit()">
+          <option value="">— Select unit —</option>
+        </select>
+      </div>
+
+      <div id="studentPreview" class="hidden" style="margin-bottom:14px;">
+        <div class="muted">Students in this unit: <strong id="studentCount">0</strong></div>
+      </div>
+
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" id="notifTitle" placeholder="e.g. Class rescheduled to Friday">
+      </div>
+      <div class="form-group">
+        <label>Message</label>
+        <textarea id="notifMessage" placeholder="Write your message to students…"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Type</label>
+        <select id="notifType">
+          <option value="general">General</option>
+          <option value="timetable_change">Timetable Change</option>
+          <option value="sync_reminder">Sync Reminder</option>
+        </select>
+      </div>
+
+      <button class="btn btn-accent" onclick="sendNotification()" id="sendBtn">
+        Send to Students
+      </button>
+    </div>
+
+    <!-- Students list card -->
+    <div class="card" id="studentsCard" style="display:none;">
+      <div class="card-header">
+        <span class="card-title" id="studentsCardTitle">Students</span>
+        <button class="btn btn-outline btn-sm" onclick="closeStudents()">Close</button>
+      </div>
+      <div id="studentsContent"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════════════════ SCRIPT ════════════════ -->
+<script>
+const API = 'https://smarttt-backend-n44z.onrender.com/api/v1/';
+
+// ── Token helpers ──────────────────────────────────────────────────────────
+function getToken() { return localStorage.getItem('lect_token'); }
+function setToken(t, r) {
+  localStorage.setItem('lect_token', t);
+  localStorage.setItem('lect_refresh', r);
+}
+function clearToken() {
+  localStorage.removeItem('lect_token');
+  localStorage.removeItem('lect_refresh');
+}
+
+// ── API helper ─────────────────────────────────────────────────────────────
+async function apiFetch(path, options = {}) {
+  const token = getToken();
+  const headers = { ...(options.headers || {}) };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (!(options.body instanceof FormData) && options.body) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const res = await fetch(API + path, { ...options, headers });
+  if (res.status === 401) { doLogout(); throw new Error('Session expired.'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+  return data;
+}
+
+// ── Auth tab ───────────────────────────────────────────────────────────────
+function showTab(tab) {
+  document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('registerForm').classList.toggle('hidden', tab !== 'register');
+  document.querySelectorAll('.auth-tab').forEach((el, i) => {
+    el.classList.toggle('active', (i === 0 && tab === 'login') || (i === 1 && tab === 'register'));
+  });
+}
+
+function showAlert(elId, msg, type) {
+  const el = document.getElementById(elId);
+  el.innerHTML = msg
+    ? `<div class="alert alert-${type}">${msg}</div>`
+    : '';
+}
+
+// ── Login ──────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const identifier = document.getElementById('loginIdentifier').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if (!identifier || !password) {
+    showAlert('loginAlert', 'Email/Staff ID and password are required.', 'error');
+    return;
+  }
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+
+  // If identifier looks like an email use it directly, otherwise treat as staff ID → use as username
+  const isEmail = identifier.includes('@');
+  const payload = isEmail
+    ? { email: identifier, password }
+    : { email: identifier, password }; // backend login uses email field but we stored staff_id as university_id
+                                        // so we attempt login with it as email then fallback
+
+  try {
+    // Try email login first
+    let data;
+    try {
+      data = await apiFetch('auth/login/', { method: 'POST', body: JSON.stringify(payload) });
+    } catch (_) {
+      // If failed and not an email, try looking up by university_id (staff id)
+      if (!isEmail) {
+        // We don't have a staff-id-login endpoint yet, so tell user to use email
+        throw new Error('Please use your school email address to sign in.');
+      }
+      throw _;
+    }
+
+    if (data.user.role !== 'lecturer') {
+      showAlert('loginAlert', 'This portal is for lecturers only.', 'error');
+      return;
+    }
+    setToken(data.access, data.refresh);
+    showMain(data.user);
+  } catch (err) {
+    showAlert('loginAlert', err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+}
+
+// ── Register ───────────────────────────────────────────────────────────────
+async function doRegister() {
+  const staffId = document.getElementById('regStaffId').value.trim();
+  const name = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const dept = document.getElementById('regDepartment').value;
+  const pass = document.getElementById('regPassword').value;
+  const confirm = document.getElementById('regConfirm').value;
+
+  if (!staffId || !name || !email || !pass) {
+    showAlert('registerAlert', 'All required fields must be filled.', 'error');
+    return;
+  }
+  if (pass !== confirm) {
+    showAlert('registerAlert', 'Passwords do not match.', 'error');
+    return;
+  }
+  if (pass.length < 6) {
+    showAlert('registerAlert', 'Password must be at least 6 characters.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('registerBtn');
+  btn.disabled = true; btn.textContent = 'Creating account…';
+
+  const body = { staff_id: staffId, email, full_name: name, password: pass };
+  if (dept) body.department = dept;
+
+  try {
+    const data = await apiFetch('auth/lecturer/register/', {
+      method: 'POST', body: JSON.stringify(body),
+    });
+    setToken(data.access, data.refresh);
+    showMain(data.user);
+  } catch (err) {
+    showAlert('registerAlert', err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Create Account';
+  }
+}
+
+// ── Logout ─────────────────────────────────────────────────────────────────
+function doLogout() {
+  clearToken();
+  document.getElementById('mainView').classList.add('hidden');
+  document.getElementById('authView').classList.remove('hidden');
+}
+
+// ── Show main view ─────────────────────────────────────────────────────────
+function showMain(user) {
+  document.getElementById('authView').classList.add('hidden');
+  document.getElementById('mainView').classList.remove('hidden');
+  document.getElementById('navName').textContent = user.full_name || user.email;
+  loadProfile();
+  loadDepartments();
+}
+
+// ── Load departments for register form ─────────────────────────────────────
+async function loadDepartments() {
+  try {
+    const data = await apiFetch('core/departments/');
+    const results = Array.isArray(data) ? data : (data.results || []);
+    const select = document.getElementById('regDepartment');
+    if (!select) return;
+    select.innerHTML = '<option value="">— Select department (optional) —</option>';
+    results.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.id;
+      opt.textContent = d.name;
+      select.appendChild(opt);
+    });
+  } catch (_) {}
+}
+
+// ── Load profile + timetable ───────────────────────────────────────────────
+let mySlots = [];
+let myUnits = {};
+
+async function loadProfile() {
+  try {
+    const data = await apiFetch('auth/lecturer/profile/');
+    const slots = data.slots || [];
+    mySlots = slots;
+
+    // term badge
+    document.getElementById('termBadge').textContent = data.current_term || 'No active term';
+
+    // derive unique units
+    const unitMap = {};
+    slots.forEach(s => {
+      if (!unitMap[s.unit]) unitMap[s.unit] = { code: s.unit_code, name: s.unit_name, id: s.unit };
+    });
+    myUnits = unitMap;
+
+    // stats
+    const uniqueUnitCount = Object.keys(unitMap).length;
+    document.getElementById('statUnits').textContent = uniqueUnitCount;
+    document.getElementById('statSessions').textContent = slots.length;
+
+    // populate unit dropdown for notifications
+    const unitSelect = document.getElementById('notifUnit');
+    unitSelect.innerHTML = '<option value="">— Select unit —</option>';
+    Object.values(unitMap).forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.id;
+      opt.textContent = `${u.code} — ${u.name}`;
+      unitSelect.appendChild(opt);
+    });
+
+    // load total student count across all units
+    let total = 0;
+    for (const uid of Object.keys(unitMap)) {
+      try {
+        const studs = await apiFetch(`auth/lecturer/students/?unit=${uid}`);
+        total += studs.length;
+      } catch (_) {}
+    }
+    document.getElementById('statStudents').textContent = total;
+
+    // render timetable
+    renderTimetable(slots);
+  } catch (err) {
+    document.getElementById('timetableContent').innerHTML =
+      `<div class="alert alert-error">${err.message}</div>`;
+  }
+}
+
+// ── Render timetable ───────────────────────────────────────────────────────
+function renderTimetable(slots) {
+  const dayOrder = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const dayNames = { MON:'Monday', TUE:'Tuesday', WED:'Wednesday', THU:'Thursday', FRI:'Friday', SAT:'Saturday' };
+  const colors = ['', 'accent', '', 'accent', '', 'accent'];
+
+  const grouped = {};
+  slots.forEach(s => {
+    if (!grouped[s.day]) grouped[s.day] = [];
+    grouped[s.day].push(s);
+  });
+  dayOrder.forEach(day => {
+    if (grouped[day]) grouped[day].sort((a, b) => a.start_time.localeCompare(b.start_time));
+  });
+
+  const activeDays = dayOrder.filter(d => grouped[d]);
+  if (activeDays.length === 0) {
+    document.getElementById('timetableContent').innerHTML =
+      '<div class="empty-state">No classes assigned for this term yet.</div>';
+    return;
+  }
+
+  let html = '';
+  activeDays.forEach((day, i) => {
+    html += `<div class="day-label">${dayNames[day]}</div>`;
+    grouped[day].forEach(slot => {
+      html += `
+        <div class="slot-card ${colors[i] || ''}" onclick="showStudentsFor('${slot.unit}', '${slot.unit_code} — ${slot.unit_name}')">
+          <div class="slot-time">${slot.start_time?.slice(0,5)} – ${slot.end_time?.slice(0,5)}</div>
+          <div class="slot-title">${slot.unit_name}</div>
+          <div class="slot-meta">
+            ${slot.unit_code}
+            ${slot.room_code ? ' · ' + slot.room_code : ''}
+            ${slot.program_name ? ' · ' + slot.program_name : ''}
+          </div>
+        </div>`;
+    });
+    html += '<hr class="divider">';
+  });
+
+  document.getElementById('timetableContent').innerHTML = html;
+}
+
+// ── Show students for a unit ───────────────────────────────────────────────
+async function showStudentsFor(unitId, unitLabel) {
+  const card = document.getElementById('studentsCard');
+  const content = document.getElementById('studentsContent');
+  const title = document.getElementById('studentsCardTitle');
+
+  card.style.display = 'block';
+  title.textContent = `Students — ${unitLabel}`;
+  content.innerHTML = '<div style="padding:20px;text-align:center"><div class="spinner"></div></div>';
+  card.scrollIntoView({ behavior: 'smooth' });
+
+  try {
+    const students = await apiFetch(`auth/lecturer/students/?unit=${unitId}`);
+    if (students.length === 0) {
+      content.innerHTML = '<div class="empty-state">No students enrolled in this unit yet.</div>';
+      return;
+    }
+    content.innerHTML = `
+      <table>
+        <thead><tr><th>#</th><th>Name</th><th>Admission No.</th><th>Email</th></tr></thead>
+        <tbody>
+          ${students.map((s, i) => `
+            <tr>
+              <td class="muted">${i + 1}</td>
+              <td>${s.name || '—'}</td>
+              <td><span class="badge badge-primary">${s.university_id || '—'}</span></td>
+              <td class="muted">${s.email}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      <div class="muted" style="margin-top:10px">${students.length} student(s) enrolled</div>`;
+  } catch (err) {
+    content.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+  }
+}
+
+function closeStudents() {
+  document.getElementById('studentsCard').style.display = 'none';
+}
+
+// ── Load students count for notification preview ───────────────────────────
+let selectedUnitStudents = 0;
+async function loadStudentsForUnit() {
+  const unitId = document.getElementById('notifUnit').value;
+  const preview = document.getElementById('studentPreview');
+  if (!unitId) { preview.classList.add('hidden'); return; }
+
+  try {
+    const students = await apiFetch(`auth/lecturer/students/?unit=${unitId}`);
+    selectedUnitStudents = students.length;
+    document.getElementById('studentCount').textContent = students.length;
+    preview.classList.remove('hidden');
+  } catch (_) {
+    preview.classList.add('hidden');
+  }
+}
+
+// ── Send notification ──────────────────────────────────────────────────────
+async function sendNotification() {
+  const unitId = document.getElementById('notifUnit').value;
+  const title = document.getElementById('notifTitle').value.trim();
+  const message = document.getElementById('notifMessage').value.trim();
+  const type = document.getElementById('notifType').value;
+
+  if (!unitId) { showAlert('notifAlert', 'Please select a unit.', 'error'); return; }
+  if (!title) { showAlert('notifAlert', 'Title is required.', 'error'); return; }
+  if (!message) { showAlert('notifAlert', 'Message is required.', 'error'); return; }
+
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+
+  try {
+    const data = await apiFetch('notifications/lecturer/send/', {
+      method: 'POST',
+      body: JSON.stringify({
+        title,
+        message,
+        notification_type: type,
+        unit_id: unitId,
+      }),
+    });
+    showAlert('notifAlert',
+      `✓ Sent to ${data.recipients} student(s). Push: ${data.push_sent}/${data.push_attempted}`,
+      'success');
+    document.getElementById('notifTitle').value = '';
+    document.getElementById('notifMessage').value = '';
+  } catch (err) {
+    showAlert('notifAlert', err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send to Students';
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+if (getToken()) {
+  document.getElementById('authView').classList.add('hidden');
+  document.getElementById('mainView').classList.remove('hidden');
+  apiFetch('auth/profile/').then(user => {
+    document.getElementById('navName').textContent = user.full_name || user.email;
+    loadProfile();
+    loadDepartments();
+  }).catch(doLogout);
+}
+</script>
+
+</body>
+</html>

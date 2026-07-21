@@ -77,7 +77,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               
               const SizedBox(height: 8),
               Text(
-                'Join the Smart Timetable Community',
+                'Join the Smart ClassCatch Community',
                 style: Theme.of(context).textTheme.bodyMedium,
               ).animate().fadeIn(delay: 100.ms).moveX(begin: -20),
               

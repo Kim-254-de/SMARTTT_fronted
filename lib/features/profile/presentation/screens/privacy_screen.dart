@@ -52,12 +52,12 @@ class PrivacyScreen extends StatelessWidget {
 }
 
 const String _privacyText = '''
-SMARTTT — Privacy Policy
+SMART CLASSCATCH — Privacy Policy
 
 Last updated: 2026-07-03
 
 Introduction
-This Privacy Policy explains how SMARTTT collects, uses, shares, and protects information when you use the SMARTTT mobile and web applications ("App"). By using the App you agree to the practices described in this policy.
+This Privacy Policy explains how SMART CLASSCATCH collects, uses, shares, and protects information when you use the SMART CLASSCATCH mobile and web applications ("App"). By using the App you agree to the practices described in this policy.
 
 1. Information We Collect
 - Profile information: name, email, admission number, phone number.

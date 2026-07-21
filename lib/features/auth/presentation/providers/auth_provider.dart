@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/auth_repository.dart';
 import '../../domain/models/user_model.dart';
+import '../../../notifications/services/fcm_service.dart';
 
 class AuthState {
   final UserModel? user;
@@ -61,6 +62,7 @@ class AuthNotifier extends Notifier<AuthState> {
     try {
       final user = await repository.login(email, password);
       state = AuthState(user: user, isLoading: false);
+      Future.microtask(() => FCMService.registerToken());
     } catch (e) {
       state = AuthState(isLoading: false, error: _extractErrorMessage(e));
     }
@@ -74,6 +76,7 @@ class AuthNotifier extends Notifier<AuthState> {
   }) async {
     final repository = ref.read(authRepositoryProvider);
     state = state.copyWith(isLoading: true, clearError: true);
+    Future.microtask(() => FCMService.registerToken());
     try {
       final user = await repository.register(
         fullName: fullName,
@@ -91,6 +94,7 @@ class AuthNotifier extends Notifier<AuthState> {
   /// since token storage and API call are handled in SocialAuthButtons.
   void setUserFromGoogle(UserModel user) {
     state = AuthState(user: user, isLoading: false);
+    Future.microtask(() => FCMService.registerToken());
   }
 
   Future<void> logout() async {

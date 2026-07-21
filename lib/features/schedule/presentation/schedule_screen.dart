@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../domain/models/timetable_session_model.dart';
 import 'providers/timetable_provider.dart';
@@ -33,6 +34,18 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     });
   }
 
+  // iCalendar
+ Future<void> subscribeCalendar() async {
+  final uri = Uri.parse(
+    'https://smarttt-backend-n44z.onrender.com/api/v1/schedule/calendar.ics',
+  );
+
+  await launchUrl(
+    uri,
+    mode: LaunchMode.externalApplication,
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(timetableProvider);
@@ -42,17 +55,34 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     return Scaffold(
       backgroundColor: AppTheme.getBackground(context),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        automaticallyImplyLeading: false,
         title: const Text('Class Schedule'),
         centerTitle: true,
-      ),
+       ),
       body: RefreshIndicator(
         onRefresh: () => ref.read(timetableProvider.notifier).fetchMySchedule(),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
           children: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: subscribeCalendar,
+                icon: const Icon(Icons.calendar_month),
+                label: const Text('Add to Calendar'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
             if (state.termLabel != null) ...[
               _InfoCard(
                 title: 'Current Term',

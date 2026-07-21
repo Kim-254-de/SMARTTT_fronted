@@ -80,7 +80,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 8),
               Center(
                 child: Text(
-                  'Sign in to your Smart Timetable',
+                  'Sign in to your Smart ClassCatch',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
