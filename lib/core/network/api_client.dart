@@ -27,7 +27,8 @@ class ApiClient {
         onRequest: (options, handler) async {
           final isPublic = options.path.contains('auth/login') ||
               options.path.contains('auth/register') ||
-              options.path.contains('auth/token/refresh');
+              options.path.contains('auth/token/refresh') ||
+              options.path.contains('auth/password/reset');
 
           if (!isPublic) {
             final prefs = await SharedPreferences.getInstance();

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -8,34 +8,50 @@ import '../../../../widgets/premium_button.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_text_field.dart';
 
-class ForgotPasswordScreen extends ConsumerStatefulWidget {
-  const ForgotPasswordScreen({super.key});
+class ResetPasswordScreen extends ConsumerStatefulWidget {
+  final String token;
+
+  const ResetPasswordScreen({super.key, required this.token});
 
   @override
-  ConsumerState<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
-  final _emailController = TextEditingController();
+class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
   bool _isSubmitting = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      _showMessage('Enter your email address.');
+    final password = _passwordController.text;
+    final confirmation = _confirmController.text;
+    if (password.isEmpty || confirmation.isEmpty) {
+      _showMessage('Enter and confirm your new password.');
+      return;
+    }
+    if (password != confirmation) {
+      _showMessage('Passwords do not match.');
       return;
     }
 
     setState(() => _isSubmitting = true);
     try {
-      await ref.read(authRepositoryProvider).forgotPassword(email);
-      if (mounted) _showMessage('If an account exists, a recovery link has been sent.');
+      await ref.read(authRepositoryProvider).confirmPasswordReset(
+            token: widget.token,
+            newPassword: password,
+            confirmPassword: confirmation,
+          );
+      if (mounted) {
+        _showMessage('Password updated successfully.');
+        context.go('/login');
+      }
     } catch (error) {
       if (mounted) _showMessage(error.toString().replaceFirst('Exception: ', ''));
     } finally {
@@ -61,7 +77,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             children: [
               const SizedBox(height: 20),
               IconButton(
-                onPressed: () => context.pop(),
+                onPressed: () => context.go('/login'),
                 icon: Icon(Iconsax.arrow_left_2, color: AppTheme.getTextPrimary(context)),
                 style: IconButton.styleFrom(
                   backgroundColor: AppTheme.getSurface(context),
@@ -69,48 +85,32 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   side: BorderSide(color: AppTheme.getBorder(context)),
                 ),
               ),
-              
               const SizedBox(height: 40),
-              Text(
-                'Reset Password',
-                style: Theme.of(context).textTheme.displayLarge,
-              ).animate().fadeIn().moveX(begin: -20),
-              
+              Text('Choose a new password', style: Theme.of(context).textTheme.displayLarge)
+                  .animate().fadeIn().moveX(begin: -20),
               const SizedBox(height: 8),
-              Text(
-                'Enter your student email to receive a recovery link',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ).animate().fadeIn(delay: 100.ms).moveX(begin: -20),
-              
+              Text('Your reset link is valid for a limited time.',
+                      style: Theme.of(context).textTheme.bodyMedium)
+                  .animate().fadeIn(delay: 100.ms).moveX(begin: -20),
               const SizedBox(height: 40),
-              
               AuthTextField(
-                hintText: 'Student Email',
-                icon: Iconsax.sms,
-                controller: _emailController,
+                hintText: 'New Password',
+                icon: Iconsax.lock,
+                isPassword: true,
+                controller: _passwordController,
               ).animate().fadeIn(delay: 200.ms).moveY(begin: 10),
-              
+              const SizedBox(height: 16),
+              AuthTextField(
+                hintText: 'Confirm Password',
+                icon: Iconsax.lock,
+                isPassword: true,
+                controller: _confirmController,
+              ).animate().fadeIn(delay: 250.ms).moveY(begin: 10),
               const SizedBox(height: 32),
-              
               PremiumButton(
-                text: _isSubmitting ? 'Sending...' : 'Send Reset Link',
+                text: _isSubmitting ? 'Updating...' : 'Update Password',
                 onPressed: _isSubmitting ? () {} : _submit,
               ).animate().fadeIn(delay: 300.ms).scale(),
-              
-              const SizedBox(height: 40),
-              
-              Center(
-                child: TextButton(
-                  onPressed: () => context.pop(),
-                  child: Text(
-                    'Remember password? Sign In',
-                    style: TextStyle(
-                      color: AppTheme.getTextSecondary(context),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ).animate().fadeIn(delay: 400.ms),
             ],
           ),
         ),

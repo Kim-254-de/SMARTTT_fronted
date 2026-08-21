@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
+import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/edit_profile_screen.dart';
@@ -68,6 +69,13 @@ GoRouter createRouter(Ref ref) {
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
+        path: '/reset-password',
+        name: 'reset-password',
+        builder: (context, state) => ResetPasswordScreen(
+          token: state.uri.queryParameters['token'] ?? '',
+        ),
+      ),
+      GoRoute(
         path: '/home',
         name: 'home',
         builder: (context, state) => const HomeScreen(),
@@ -112,7 +120,8 @@ GoRouter createRouter(Ref ref) {
       final authState = ref.read(authProvider);
       final isAuthEntry = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register' ||
-          state.matchedLocation == '/forgot-password';
+          state.matchedLocation == '/forgot-password' ||
+          state.matchedLocation == '/reset-password';
       final isPublicPolicyPage = state.matchedLocation == '/terms' ||
           state.matchedLocation == '/privacy';
 
