@@ -1,0 +1,1 @@
+Future<bool> requestCalendarAccess() async => true;

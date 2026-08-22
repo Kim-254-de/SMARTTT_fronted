@@ -3,10 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../domain/models/timetable_session_model.dart';
+import '../services/calendar_access_service.dart';
 import 'providers/timetable_provider.dart';
 
 class ScheduleScreen extends ConsumerStatefulWidget {
-  const ScheduleScreen({Key? key}) : super(key: key);
+  const ScheduleScreen({super.key});
 
   @override
   ConsumerState<ScheduleScreen> createState() => _ScheduleScreenState();
@@ -34,18 +35,32 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     });
   }
 
-  // iCalendar
+  Future<void> subscribeCalendar() async {
+    final hasAccess = await requestCalendarAccess();
+    if (!mounted) return;
 
- Future<void> subscribeCalendar() async {
-  final uri = Uri.parse(
-    'https://smarttt-backend-n44z.onrender.com/api/v1/schedule/calendar.ics',
-  );
+    if (!hasAccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Calendar access is required to subscribe.'),
+        ),
+      );
+      return;
+    }
 
-  await launchUrl(
-    uri,
-    mode: LaunchMode.externalApplication,
-  );
-}
+    final uri = Uri.parse(
+      'https://smarttt-backend-n44z.onrender.com/api/v1/schedule/calendar.ics',
+    );
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the calendar feed.')),
+      );
+    }
+  }
 
 
   @override
@@ -209,7 +224,7 @@ class _SessionCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.1),
+                  color: AppTheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
