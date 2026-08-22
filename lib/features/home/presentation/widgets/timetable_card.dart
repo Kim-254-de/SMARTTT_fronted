@@ -29,7 +29,7 @@ class TimetableCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final opacity = isCompleted ? 0.5 : 1.0;
     final borderColor = isCurrent ? color : AppTheme.border;
-    final bgColor = isBreak ? color.withOpacity(0.1) : AppTheme.surface;
+    final bgColor = isBreak ? color.withValues(alpha: 0.1) : AppTheme.surface;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -50,7 +50,7 @@ class TimetableCard extends StatelessWidget {
               width: 50,
               height: 50,
               decoration: BoxDecoration(
-                color: isBreak ? color : color.withOpacity(0.1),
+                color: isBreak ? color : color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
@@ -87,7 +87,7 @@ class TimetableCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: color.withOpacity(0.2),
+                            color: color.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(

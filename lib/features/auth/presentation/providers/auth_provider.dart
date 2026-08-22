@@ -51,6 +51,7 @@ class AuthNotifier extends Notifier<AuthState> {
     try {
       final user = await repository.fetchProfile();
       state = AuthState(user: user, isLoading: false);
+      Future.microtask(() => FCMService.registerToken());
     } catch (e) {
       state = AuthState(isLoading: false);
     }
@@ -76,7 +77,6 @@ class AuthNotifier extends Notifier<AuthState> {
   }) async {
     final repository = ref.read(authRepositoryProvider);
     state = state.copyWith(isLoading: true, clearError: true);
-    Future.microtask(() => FCMService.registerToken());
     try {
       final user = await repository.register(
         fullName: fullName,
@@ -85,6 +85,7 @@ class AuthNotifier extends Notifier<AuthState> {
         universityId: universityId,
       );
       state = AuthState(user: user, isLoading: false);
+      Future.microtask(() => FCMService.registerToken());
     } catch (e) {
       state = AuthState(isLoading: false, error: _extractErrorMessage(e));
     }

@@ -16,7 +16,7 @@ class SplashScreen extends StatelessWidget {
               width: 84,
               height: 84,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
+                color: Colors.white.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.school_rounded, color: Colors.white, size: 42),
@@ -35,7 +35,7 @@ class SplashScreen extends StatelessWidget {
             Text(
               'Loading your timetable...',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 fontSize: 14,
               ),
             ),

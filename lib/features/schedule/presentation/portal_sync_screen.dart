@@ -12,7 +12,7 @@ import 'providers/timetable_provider.dart';
 /// saves them, and discards the credentials immediately — they are never
 /// stored anywhere, client or server.
 class PortalSyncScreen extends ConsumerStatefulWidget {
-  const PortalSyncScreen({Key? key}) : super(key: key);
+  const PortalSyncScreen({super.key});
 
   @override
   ConsumerState<PortalSyncScreen> createState() => _PortalSyncScreenState();
@@ -94,7 +94,7 @@ class _PortalSyncScreenState extends ConsumerState<PortalSyncScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.08),
+                  color: AppTheme.primary.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(

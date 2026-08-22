@@ -90,7 +90,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 class _HomeTab extends ConsumerWidget {
   final VoidCallback onViewSchedule;
 
-  const _HomeTab({super.key, required this.onViewSchedule});
+  const _HomeTab({required this.onViewSchedule});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -174,7 +174,7 @@ class _HomeTab extends ConsumerWidget {
           padding: const EdgeInsets.all(8.0),
           child: Container(
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.1),
+              color: AppTheme.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -346,7 +346,7 @@ Consumer(
         width: double.infinity,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: AppTheme.error.withOpacity(0.1),
+          color: AppTheme.error.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -373,15 +373,15 @@ Consumer(
         width: double.infinity,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: AppTheme.primary.withOpacity(0.05),
+          color: AppTheme.primary.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
+          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.1)),
         ),
         child: const Center(
           child: Column(
             children: [
               Icon(Iconsax.coffee, color: AppTheme.primary, size: 36),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Text(
                 'No classes scheduled for today',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),

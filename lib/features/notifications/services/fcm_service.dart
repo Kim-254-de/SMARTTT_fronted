@@ -1,26 +1,57 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
 
 class FCMService {
   static final _messaging = FirebaseMessaging.instance;
+  static final _messageEvents = StreamController<RemoteMessage>.broadcast();
+  static bool _listenersReady = false;
+  static bool _tokenRefreshReady = false;
+
+  static Stream<RemoteMessage> get messageEvents => _messageEvents.stream;
+
+  static Future<void> initialize() async {
+    if (_listenersReady) return;
+    _listenersReady = true;
+    FirebaseMessaging.onMessage.listen(_messageEvents.add);
+    FirebaseMessaging.onMessageOpenedApp.listen(_messageEvents.add);
+    final initialMessage = await _messaging.getInitialMessage();
+    if (initialMessage != null) _messageEvents.add(initialMessage);
+  }
 
   /// Call on login — requests permission and registers token with backend
   static Future<void> registerToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final enabled = prefs.getBool('push_notifications_enabled') ?? true;
-    if (!enabled) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final enabled = prefs.getBool('push_notifications_enabled') ?? true;
+      if (!enabled) return;
 
-    // Request permission (iOS / web)
-    await _messaging.requestPermission();
+      await _messaging.requestPermission();
+      final token = await _messaging.getToken();
+      if (token == null) return;
 
-    final token = await _messaging.getToken();
-    if (token == null) return;
+      await _sendToken(token, _platformName());
+      if (!_tokenRefreshReady) {
+        _tokenRefreshReady = true;
+        _messaging.onTokenRefresh.listen(
+          (newToken) => _sendToken(newToken, _platformName()),
+        );
+      }
+    } catch (_) {}
+  }
 
-    await _sendToken(token, 'android');
-
-    // Listen for token refresh
-    _messaging.onTokenRefresh.listen((newToken) => _sendToken(newToken, 'android'));
+  static String _platformName() {
+    if (kIsWeb) return 'web';
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        return 'ios';
+      default:
+        return 'android';
+    }
   }
 
   /// Call when user disables notifications — removes token from backend

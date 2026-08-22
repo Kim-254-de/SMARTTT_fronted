@@ -10,7 +10,7 @@ import 'providers/timetable_provider.dart';
 /// their registered unit codes directly. Backend matches these against the
 /// master timetable the same way it would scraped codes.
 class ManualSyncScreen extends ConsumerStatefulWidget {
-  const ManualSyncScreen({Key? key}) : super(key: key);
+  const ManualSyncScreen({super.key});
 
   @override
   ConsumerState<ManualSyncScreen> createState() => _ManualSyncScreenState();
