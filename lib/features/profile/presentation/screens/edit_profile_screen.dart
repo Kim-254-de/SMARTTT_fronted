@@ -2,15 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
-import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/widgets/auth_text_field.dart';
 import '../../../../widgets/premium_button.dart';
 
-/// NOTE: The backend's User model only stores: email, full_name, university_id,
-/// phone_number. There is no course/department/year_of_study on the user yet —
-/// those would belong to a separate Student profile that hasn't been built.
-/// This screen only edits what the backend can actually persist.
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -21,6 +16,10 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
+  late TextEditingController _admissionController;
+  late TextEditingController _courseController;
+  late TextEditingController _departmentController;
+  late TextEditingController _yearController;
 
   @override
   void initState() {
@@ -28,20 +27,26 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final user = ref.read(authProvider).user;
     _nameController = TextEditingController(text: user?.fullName);
     _phoneController = TextEditingController(text: user?.phoneNumber);
+    _admissionController = TextEditingController(text: user?.universityId);
+    _courseController = TextEditingController(text: user?.course);
+    _departmentController = TextEditingController(text: user?.department);
+    _yearController = TextEditingController(text: user?.yearOfStudy?.toString());
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _admissionController.dispose();
+    _courseController.dispose();
+    _departmentController.dispose();
+    _yearController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    final user = authState.user;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Profile'),
@@ -62,26 +67,29 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               icon: Iconsax.call,
             ),
             const SizedBox(height: 16),
-            // Admission number is set at registration and is read-only here.
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: AppTheme.getSurface(context),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.getBorder(context)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Iconsax.hashtag, color: AppTheme.getTextSecondary(context)),
-                  const SizedBox(width: 12),
-                  Text(
-                    user?.universityId?.isNotEmpty == true
-                        ? user!.universityId!
-                        : 'No admission number on file',
-                    style: TextStyle(color: AppTheme.getTextSecondary(context)),
-                  ),
-                ],
-              ),
+            AuthTextField(
+              controller: _admissionController,
+              hintText: 'Admission Number',
+              icon: Iconsax.hashtag,
+            ),
+            const SizedBox(height: 16),
+            AuthTextField(
+              controller: _courseController,
+              hintText: 'Course',
+              icon: Iconsax.book,
+            ),
+            const SizedBox(height: 16),
+            AuthTextField(
+              controller: _departmentController,
+              hintText: 'Department',
+              icon: Iconsax.building,
+            ),
+            const SizedBox(height: 16),
+            AuthTextField(
+              controller: _yearController,
+              hintText: 'Year of Study',
+              icon: Iconsax.calendar,
+              keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 32),
             if (authState.isLoading)
@@ -93,6 +101,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   await ref.read(authProvider.notifier).updateProfile(
                         fullName: _nameController.text,
                         phoneNumber: _phoneController.text,
+                        admissionNumber: _admissionController.text,
+                        course: _courseController.text,
+                        department: _departmentController.text,
+                        yearOfStudy: int.tryParse(_yearController.text),
                       );
                   if (mounted && ref.read(authProvider).error == null) {
                     ScaffoldMessenger.of(context).showSnackBar(

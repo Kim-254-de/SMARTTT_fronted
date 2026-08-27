@@ -5,6 +5,9 @@ class UserModel {
   final String? universityId;
   final String role;
   final String? phoneNumber;
+  final String? course;
+  final String? department;
+  final int? yearOfStudy;
 
   UserModel({
     required this.id,
@@ -13,6 +16,9 @@ class UserModel {
     this.universityId,
     this.role = 'student',
     this.phoneNumber,
+    this.course,
+    this.department,
+    this.yearOfStudy,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -23,6 +29,11 @@ class UserModel {
       universityId: json['university_id']?.toString(),
       role: json['role']?.toString() ?? 'student',
       phoneNumber: json['phone_number']?.toString(),
+      course: json['course']?.toString(),
+      department: json['department']?.toString(),
+      yearOfStudy: json['year_of_study'] is int
+          ? json['year_of_study'] as int
+          : int.tryParse(json['year_of_study']?.toString() ?? ''),
     );
   }
 

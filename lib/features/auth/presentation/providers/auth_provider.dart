@@ -107,6 +107,10 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> updateProfile({
     required String fullName,
     String? phoneNumber,
+    String? admissionNumber,
+    String? course,
+    String? department,
+    int? yearOfStudy,
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
@@ -114,6 +118,10 @@ class AuthNotifier extends Notifier<AuthState> {
       final user = await repository.updateProfile(
         fullName: fullName,
         phoneNumber: phoneNumber,
+        admissionNumber: admissionNumber,
+        course: course,
+        department: department,
+        yearOfStudy: yearOfStudy,
       );
       state = state.copyWith(user: user, isLoading: false);
     } catch (e) {
