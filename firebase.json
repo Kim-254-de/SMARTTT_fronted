@@ -1,1 +1,40 @@
-{"hosting":{"public":"build/web","ignore":["firebase.json","**/.*","**/node_modules/**"],"rewrites":[{"source":"!/admin.html","destination":"/index.html"}]},"flutter":{"platforms":{"android":{"default":{"projectId":"smart-timetable-8f116","appId":"1:538465698343:android:05cf7b27ddffaae5168402","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"smart-timetable-8f116","configurations":{"android":"1:538465698343:android:05cf7b27ddffaae5168402","ios":"1:538465698343:ios:be5b1c2c7b680fa9168402","macos":"1:538465698343:ios:be5b1c2c7b680fa9168402","web":"1:538465698343:web:3a4a9828507d30e7168402","windows":"1:538465698343:web:db4a6fb93b61fa11168402"}}}}}}
+{
+  "hosting": {
+    "site": "smart-timetable-8f116",
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "smart-timetable-8f116",
+          "appId": "1:538465698343:android:05cf7b27ddffaae5168402",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "smart-timetable-8f116",
+          "configurations": {
+            "android": "1:538465698343:android:05cf7b27ddffaae5168402",
+            "ios": "1:538465698343:ios:be5b1c2c7b680fa9168402",
+            "macos": "1:538465698343:ios:be5b1c2c7b680fa9168402",
+            "web": "1:538465698343:web:3a4a9828507d30e7168402",
+            "windows": "1:538465698343:web:db4a6fb93b61fa11168402"
+          }
+        }
+      }
+    }
+  }
+}
