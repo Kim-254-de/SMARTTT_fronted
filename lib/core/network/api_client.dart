@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 // ─── Base URL ───────────────────────────────────────────────────────────────
 // Switch between environments here. Production always uses HTTPS.
-const String _baseUrl = 'https://smarttt-backend-n44z.onrender.com/api/v1/';
+const String _baseUrl = 'https://api.nextup.co.ke/api/v1/';
 //const String _baseUrl = 'http://localhost:8000/api/v1/';
 
 class ApiClient {
