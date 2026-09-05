@@ -9,6 +9,7 @@ class TimetableState {
   final List<TimetableSessionModel> sessions;
   final List<Map<String, dynamic>> conflicts;
   final int unitCount;
+  final bool isFromCache;
 
   TimetableState({
     this.isLoading = false,
@@ -17,6 +18,7 @@ class TimetableState {
     this.sessions = const [],
     this.conflicts = const [],
     this.unitCount = 0,
+    this.isFromCache = false,
   });
 
   TimetableState copyWith({
@@ -26,6 +28,7 @@ class TimetableState {
     List<TimetableSessionModel>? sessions,
     List<Map<String, dynamic>>? conflicts,
     int? unitCount,
+    bool? isFromCache,
   }) {
     return TimetableState(
       isLoading: isLoading ?? this.isLoading,
@@ -34,6 +37,7 @@ class TimetableState {
       sessions: sessions ?? this.sessions,
       conflicts: conflicts ?? this.conflicts,
       unitCount: unitCount ?? this.unitCount,
+      isFromCache: isFromCache ?? this.isFromCache,
     );
   }
 }
@@ -46,14 +50,43 @@ class TimetableNotifier extends Notifier<TimetableState> {
   @override
   TimetableState build() {
     _repository = ref.watch(timetableRepositoryProvider);
+    // Eagerly restore cached schedule on initialization
+    Future.microtask(() async {
+      final cached = await _repository.getCachedSchedule();
+      if (cached != null && state.sessions.isEmpty) {
+        state = TimetableState(
+          isLoading: false,
+          termLabel: cached.termLabel,
+          sessions: cached.sessions,
+          conflicts: cached.conflicts,
+          unitCount: cached.unitCount,
+          isFromCache: true,
+        );
+      }
+    });
     return TimetableState();
   }
 
   /// Fetches the student's personalised, already-matched timetable.
-  /// Backend handles term resolution, unit matching, and grouping —
-  /// no client-side term lookup needed.
+  /// Backend handles term resolution, unit matching, and grouping.
+  /// Seamlessly displays cached schedule if offline.
   Future<void> fetchMySchedule() async {
-    state = state.copyWith(isLoading: true, error: null);
+    // Only show full loading spinner if we don't have cached sessions
+    if (state.sessions.isEmpty) {
+      state = state.copyWith(isLoading: true, error: null);
+      final cached = await _repository.getCachedSchedule();
+      if (cached != null) {
+        state = TimetableState(
+          isLoading: false,
+          termLabel: cached.termLabel,
+          sessions: cached.sessions,
+          conflicts: cached.conflicts,
+          unitCount: cached.unitCount,
+          isFromCache: true,
+        );
+      }
+    }
+
     try {
       final result = await _repository.fetchMySchedule();
       state = TimetableState(
@@ -63,9 +96,15 @@ class TimetableNotifier extends Notifier<TimetableState> {
         conflicts: result.conflicts,
         unitCount: result.unitCount,
         error: result.message,
+        isFromCache: result.isFromCache,
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      // If we already have cached sessions, preserve them!
+      if (state.sessions.isNotEmpty) {
+        state = state.copyWith(isLoading: false, isFromCache: true);
+      } else {
+        state = state.copyWith(isLoading: false, error: e.toString());
+      }
     }
   }
 

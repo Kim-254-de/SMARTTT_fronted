@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:developer' as dev;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
 import '../domain/models/academic_term_model.dart';
 import '../domain/models/timetable_session_model.dart';
@@ -12,6 +14,7 @@ class PersonalScheduleResult {
   final List<Map<String, dynamic>> conflicts;
   final int unitCount;
   final String? message;
+  final bool isFromCache;
 
   PersonalScheduleResult({
     this.termLabel,
@@ -19,10 +22,13 @@ class PersonalScheduleResult {
     required this.conflicts,
     required this.unitCount,
     this.message,
+    this.isFromCache = false,
   });
 }
 
 class TimetableRepository {
+  static const String _cachedScheduleKey = 'cached_personal_schedule';
+
   /// GET /timetable/terms/ — used to show available terms (e.g. for a term picker).
   Future<List<AcademicTermModel>> fetchTerms() async {
     try {
@@ -40,46 +46,74 @@ class TimetableRepository {
     }
   }
 
+  /// Parses raw backend response map into PersonalScheduleResult
+  PersonalScheduleResult _parseScheduleData(
+    Map<String, dynamic> data, {
+    bool isFromCache = false,
+  }) {
+    final timetable = data['timetable'] as Map<String, dynamic>? ?? {};
+    final sessions = <TimetableSessionModel>[];
+    for (final day in _dayKeys) {
+      final daySlots = timetable[day];
+      if (daySlots is List) {
+        for (final slot in daySlots) {
+          sessions.add(
+            TimetableSessionModel.fromJson(slot as Map<String, dynamic>, day: day),
+          );
+        }
+      }
+    }
+
+    final summary = data['summary'] as Map<String, dynamic>? ?? {};
+    final conflictsRaw = data['conflicts'] as List? ?? [];
+
+    return PersonalScheduleResult(
+      termLabel: data['term']?.toString(),
+      sessions: sessions,
+      conflicts: conflictsRaw.cast<Map<String, dynamic>>(),
+      unitCount: summary['unit_count'] is int ? summary['unit_count'] as int : 0,
+      message: summary['message']?.toString(),
+      isFromCache: isFromCache,
+    );
+  }
+
+  /// Retrieves previously cached schedule from local storage (if any)
+  Future<PersonalScheduleResult?> getCachedSchedule() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_cachedScheduleKey);
+      if (raw == null) return null;
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      return _parseScheduleData(data, isFromCache: true);
+    } catch (e) {
+      dev.log('Failed to decode cached schedule', error: e, name: 'TimetableRepository');
+      return null;
+    }
+  }
+
   /// GET /schedule/me/ — the personalised, already-matched-and-grouped timetable.
-  /// Backend response shape:
-  /// {
-  ///   "term": "2025/2026 Sem 1" | null,
-  ///   "units": [{id, code, name}, ...],
-  ///   "timetable": {"MON": [...], "TUE": [...], ...},
-  ///   "conflicts": [...],
-  ///   "summary": {"unit_count": n, "session_count": n, "has_conflicts": bool, "message"?: str}
-  /// }
+  /// When network is unavailable, seamlessly falls back to cached schedule.
   Future<PersonalScheduleResult> fetchMySchedule() async {
     try {
       dev.log('Fetching personalised schedule...', name: 'TimetableRepository');
       final response = await apiClient.dio.get('schedule/me/');
       final data = response.data as Map<String, dynamic>;
 
-      final timetable = data['timetable'] as Map<String, dynamic>? ?? {};
-      final sessions = <TimetableSessionModel>[];
-      for (final day in _dayKeys) {
-        final daySlots = timetable[day];
-        if (daySlots is List) {
-          for (final slot in daySlots) {
-            sessions.add(
-              TimetableSessionModel.fromJson(slot as Map<String, dynamic>, day: day),
-            );
-          }
-        }
+      // Cache raw schedule data locally
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_cachedScheduleKey, jsonEncode(data));
+      } catch (cacheErr) {
+        dev.log('Error caching schedule', error: cacheErr, name: 'TimetableRepository');
       }
 
-      final summary = data['summary'] as Map<String, dynamic>? ?? {};
-      final conflictsRaw = data['conflicts'] as List? ?? [];
-
-      return PersonalScheduleResult(
-        termLabel: data['term']?.toString(),
-        sessions: sessions,
-        conflicts: conflictsRaw.cast<Map<String, dynamic>>(),
-        unitCount: summary['unit_count'] is int ? summary['unit_count'] as int : 0,
-        message: summary['message']?.toString(),
-      );
+      return _parseScheduleData(data, isFromCache: false);
     } catch (e, stack) {
-      dev.log('Error fetching personalised schedule', error: e, stackTrace: stack, name: 'TimetableRepository');
+      dev.log('Network error fetching schedule, checking local cache...', error: e, stackTrace: stack, name: 'TimetableRepository');
+      final cached = await getCachedSchedule();
+      if (cached != null) {
+        return cached;
+      }
       rethrow;
     }
   }
