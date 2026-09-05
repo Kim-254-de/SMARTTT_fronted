@@ -46,7 +46,7 @@
   }
   .card h2 { font-size: 15px; font-weight: 600; margin: 0 0 14px; }
   label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
-  input[type="email"], input[type="password"], input[type="file"], select {
+  input[type="email"], input[type="password"], input[type="text"], input[type="file"], select, textarea {
     width: 100%;
     background: var(--surface-2);
     border: 1px solid var(--border-strong);
@@ -56,7 +56,7 @@
     font-size: 14px;
     margin-bottom: 14px;
   }
-  input::placeholder { color: var(--text-muted); }
+  input::placeholder, textarea::placeholder { color: var(--text-muted); }
   button {
     background: var(--accent);
     color: white;
@@ -83,8 +83,6 @@
   td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
   .badge-success { background: var(--success-bg); color: var(--success); }
-  .badge-muted { background: var(--surface-2); color: var(--text-secondary); }
-
   .badge-danger { background: var(--danger-bg); color: var(--danger); }
   .badge-warning { background: var(--warning-bg); color: var(--warning); }
   .badge-muted { background: var(--surface-2); color: var(--text-secondary); }
@@ -128,11 +126,13 @@
     <div class="card" style="max-width: 360px; margin: 60px auto 0;">
       <h2>Sign in</h2>
       <div id="loginStatus"></div>
-      <label>Email</label>
-      <input type="email" id="loginEmail" placeholder="admin@example.com">
-      <label>Password</label>
-      <input type="password" id="loginPassword" placeholder="••••••••">
-      <button onclick="login()" style="width: 100%;">Sign in</button>
+      <form onsubmit="event.preventDefault(); login();">
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="admin@example.com" autocomplete="username">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+        <button type="submit" style="width: 100%;">Sign in</button>
+      </form>
     </div>
   </div>
 
@@ -147,7 +147,7 @@
     <div class="card">
       <h2>Upload master timetable</h2>
       <div id="uploadStatus"></div>
-      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.pdf">
       <button onclick="uploadTimetable()" id="uploadBtn">Upload and process</button>
       <div class="upload-progress hidden" id="uploadProgress">
         <div class="spinner"></div>
@@ -176,8 +176,7 @@
       <input type="text" id="notifTitle" placeholder="e.g. Timetable Updated — Week 3">
 
       <label>Message</label>
-      <textarea id="notifMessage" rows="3"
-        style="width:100%;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;color:var(--text-primary);padding:10px 12px;font-size:14px;margin-bottom:14px;resize:vertical;"
+      <textarea id="notifMessage" rows="3" style="resize:vertical;"
         placeholder="Tell students what changed and what action to take…"></textarea>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
@@ -302,7 +301,7 @@
 </div>
 
 <script>
-const API_BASE = 'https://smarttt-backend-n44z.onrender.com/api/v1/';
+const API_BASE = 'https://api.nextup.co.ke/api/v1/';
 
 function getToken() { return localStorage.getItem('admin_token'); }
 function setToken(t) { localStorage.setItem('admin_token', t); }
@@ -310,8 +309,35 @@ function clearToken() { localStorage.removeItem('admin_token'); }
 
 function showStatus(elId, message, type) {
   const el = document.getElementById(elId);
+  if (!el) return;
+  if (!message || message === '{}' || message.trim() === '') {
+    el.innerHTML = '';
+    return;
+  }
   el.innerHTML = `<div class="status-msg status-${type}">${message}</div>`;
   if (type === 'success') setTimeout(() => { el.innerHTML = ''; }, 4000);
+}
+
+function parseErrorMessage(data) {
+  if (!data) return 'An unexpected error occurred.';
+  if (typeof data === 'string') return data;
+  if (data.detail) return data.detail;
+  if (data.message) return data.message;
+  if (data.error) {
+    if (typeof data.error === 'string') return data.error;
+    if (data.error.message) return data.error.message;
+  }
+  if (data.details && typeof data.details === 'object') {
+    const firstKey = Object.keys(data.details)[0];
+    const val = data.details[firstKey];
+    return Array.isArray(val) ? `${firstKey}: ${val[0]}` : `${firstKey}: ${val}`;
+  }
+  const keys = Object.keys(data);
+  if (keys.length > 0) {
+    const val = data[keys[0]];
+    return Array.isArray(val) ? `${keys[0]}: ${val[0]}` : `${keys[0]}: ${val}`;
+  }
+  return 'Request failed. Please check the console.';
 }
 
 async function apiFetch(path, options = {}) {
@@ -321,16 +347,18 @@ async function apiFetch(path, options = {}) {
   if (!(options.body instanceof FormData) && options.body) {
     headers['Content-Type'] = 'application/json';
   }
+  
   const res = await fetch(API_BASE + path, { ...options, headers });
+  
   if (res.status === 401) {
     clearToken();
     showLoginView();
     throw new Error('Session expired. Please sign in again.');
   }
+  
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg = data.detail || JSON.stringify(data);
-    throw new Error(msg);
+    throw new Error(parseErrorMessage(data));
   }
   return data;
 }
@@ -396,14 +424,18 @@ async function uploadTimetable() {
       body: formData,
     });
 
-    const summary = `Processed: ${data.rows_received} received, ${data.rows_saved} saved, ${data.rows_failed} failed.`;
-    showStatus('uploadStatus', summary, data.rows_failed > 0 ? 'error' : 'success');
+    const rowsSaved = data.rows_saved ?? 0;
+    const rowsReceived = data.rows_received ?? data.total_rows ?? rowsSaved;
+    const rowsFailed = data.rows_failed ?? 0;
+
+    const summary = `Processed: ${rowsReceived} received, ${rowsSaved} saved, ${rowsFailed} failed.`;
+    showStatus('uploadStatus', summary, rowsFailed > 0 ? 'error' : 'success');
 
     if (data.errors && data.errors.length > 0) {
       errorsBox.classList.remove('hidden');
       errorsBox.innerHTML = data.errors
         .slice(0, 50)
-        .map(e => `<div>Row ${e.row}: ${e.error}</div>`)
+        .map(e => `<div>Row ${e.row || e.row_number || '?'}: ${e.error || JSON.stringify(e)}</div>`)
         .join('');
     }
 
@@ -448,10 +480,10 @@ async function uploadAllocation() {
       body: formData,
     });
 
-    showStatus('allocStatus', data.detail, 'success');
+    showStatus('allocStatus', data.detail || 'Allocation uploaded successfully.', 'success');
 
     document.getElementById('allocSummary').textContent =
-      `${data.matched} matched, ${data.unmatched} unmatched — ${data.slots_updated} timetable slot(s) updated.`;
+      `${data.matched || 0} matched, ${data.unmatched || 0} unmatched — ${data.slots_updated || 0} timetable slot(s) updated.`;
 
     const matchedEl = document.getElementById('allocMatched');
     matchedEl.innerHTML = (data.results || []).map(r => `
@@ -492,7 +524,7 @@ async function loadTerms() {
     tbody.innerHTML = results.map(term => `
       <tr>
         <td>${term.academic_year} Sem ${term.semester}</td>
-        <td class="muted">${term.start_date} – ${term.end_date}</td>
+        <td class="muted">${term.start_date || '—'} – ${term.end_date || '—'}</td>
         <td>${term.is_current
           ? '<span class="badge badge-success">Current</span>'
           : '<span class="badge badge-muted">Inactive</span>'}</td>
@@ -521,7 +553,7 @@ async function clearTermSlots(termId, label) {
   if (!confirm(`Delete all timetable slots for "${label}"? This cannot be undone.`)) return;
   try {
     const data = await apiFetch(`timetable/terms/${termId}/clear-slots/`, { method: 'DELETE' });
-    showStatus('termsStatus', data.detail, 'success');
+    showStatus('termsStatus', data.detail || 'Slots cleared successfully.', 'success');
   } catch (err) {
     showStatus('termsStatus', err.message, 'error');
   }
@@ -532,6 +564,7 @@ async function clearTermSlots(termId, label) {
 function statusBadge(status) {
   const map = {
     done: 'badge-success',
+    processed: 'badge-success',
     partial: 'badge-warning',
     failed: 'badge-danger',
     processing: 'badge-muted',
@@ -546,6 +579,8 @@ async function loadUploads() {
     const results = Array.isArray(data) ? data : (data.results || []);
     const tbody = document.getElementById('uploadsTableBody');
     const empty = document.getElementById('uploadsEmpty');
+    const statusEl = document.getElementById('uploadsStatus');
+    if (statusEl) statusEl.innerHTML = '';
 
     if (results.length === 0) {
       tbody.innerHTML = '';
@@ -554,18 +589,31 @@ async function loadUploads() {
     }
     empty.classList.add('hidden');
 
-    tbody.innerHTML = results.map(u => `
-      <tr>
-        <td>${(u.uploaded_file || '').split('/').pop()}</td>
-        <td class="muted">${u.term ? '' : 'auto-resolved'}</td>
-        <td class="muted">${u.rows_saved}/${u.rows_received}</td>
-        <td>${statusBadge(u.status)}</td>
-        <td class="muted">${new Date(u.uploaded_at).toLocaleString()}</td>
-        <td class="row-actions">
-          <button class="small danger" onclick="deleteUpload('${u.id}')">Delete</button>
-        </td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = results.map(u => {
+      const rawPath = u.source_file || u.uploaded_file || u.file || u.file_name || '';
+      const fileName = rawPath ? rawPath.split('/').pop() : 'Timetable Master';
+
+      const rawDate = u.created_at || u.uploaded_at || u.processed_at || u.updated_at;
+      const formattedDate = (rawDate && !isNaN(new Date(rawDate)))
+        ? new Date(rawDate).toLocaleString()
+        : '—';
+
+      const saved = u.rows_saved ?? 0;
+      const total = u.rows_received ?? u.total_rows ?? (saved > 0 ? saved : 0);
+
+      return `
+        <tr>
+          <td>${fileName}</td>
+          <td class="muted">${u.term ? u.term : 'auto-resolved'}</td>
+          <td class="muted">${saved}/${total}</td>
+          <td>${statusBadge(u.status || 'processed')}</td>
+          <td class="muted">${formattedDate}</td>
+          <td class="row-actions">
+            <button class="small danger" onclick="deleteUpload('${u.id}')">Delete</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
   } catch (err) {
     showStatus('uploadsStatus', err.message, 'error');
   }
@@ -614,7 +662,9 @@ async function loadPrograms() {
       opt.textContent = p.name;
       select.appendChild(opt);
     });
-  } catch (_) {}
+  } catch (err) {
+    console.error('Failed to load programs:', err);
+  }
 }
 
 function updateTargetFields() {
@@ -699,6 +749,7 @@ async function loadNotificationHistory() {
     showStatus('notifHistoryStatus', err.message, 'error');
   }
 }
+
 // ───────────────── Staff IDs ─────────────────
 
 async function uploadStaffIDs() {
@@ -719,7 +770,7 @@ async function uploadStaffIDs() {
       method: 'POST',
       body: formData,
     });
-    showStatus('staffUploadStatus', data.detail, 'success');
+    showStatus('staffUploadStatus', data.detail || 'Staff IDs uploaded successfully.', 'success');
     document.getElementById('staffFileInput').value = '';
     loadStaffIDs();
   } catch (err) {

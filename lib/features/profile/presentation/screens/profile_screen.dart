@@ -9,6 +9,7 @@ import '../../../../core/theme/locale_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/theme/notifications_provider.dart';
 import '../../../notifications/services/fcm_service.dart';
+import '../widgets/delete_account_dialog.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -174,6 +175,22 @@ class ProfileScreen extends ConsumerWidget {
               title: context.tr('Account'),
               children: [
                 _buildActionTile(context, Iconsax.lock, context.tr('Change Password'), null, () {}),
+                _buildActionTile(
+                  context,
+                  Iconsax.trash,
+                  context.tr('Delete Account'),
+                  null,
+                  () async {
+                    final deleted = await showDeleteAccountDialog(context);
+                    if (deleted == true && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(context.tr('Your account has been deleted.'))),
+                      );
+                      context.go('/login');
+                    }
+                  },
+                  isDestructive: true,
+                ),
                 _buildActionTile(
                   context,
                   Iconsax.logout,

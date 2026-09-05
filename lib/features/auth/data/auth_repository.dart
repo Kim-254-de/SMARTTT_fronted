@@ -76,6 +76,21 @@ class AuthRepository {
     await prefs.remove('refresh_token');
   }
 
+  /// Deletes (deactivates) the current user's account. Requires their
+  /// current password to confirm. On success, clears local tokens too —
+  /// the backend has already blacklisted them, but this keeps client
+  /// state in sync immediately.
+  Future<void> deleteAccount(String password) async {
+    try {
+      await apiClient.dio.post('auth/account/delete/', data: {
+        'password': password,
+      });
+      await logout();
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   Future<UserModel> fetchProfile() async {
     try {
       final response = await apiClient.dio.get('auth/profile/');

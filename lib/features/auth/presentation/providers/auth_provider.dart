@@ -103,6 +103,15 @@ class AuthNotifier extends Notifier<AuthState> {
     state = AuthState();
   }
 
+  /// Deletes (deactivates) the current account. Throws on failure (e.g.
+  /// wrong password) so the calling screen can show the error — on
+  /// success, resets state to logged-out same as logout().
+  Future<void> deleteAccount(String password) async {
+    final repository = ref.read(authRepositoryProvider);
+    await repository.deleteAccount(password);
+    state = AuthState();
+  }
+
   Future<void> updateProfile({
     required String fullName,
     String? phoneNumber,
