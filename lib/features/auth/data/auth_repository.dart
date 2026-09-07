@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
 import '../domain/models/user_model.dart';
 
 class AuthRepository {
+  static const String _cachedUserKey = 'cached_user_profile';
+
   Future<UserModel> login(String email, String password) async {
     try {
       final response = await apiClient.dio.post('auth/login/', data: {
@@ -13,7 +16,9 @@ class AuthRepository {
 
       await _storeTokens(response.data);
       final userData = _extractUserData(response.data);
-      return UserModel.fromJson(userData);
+      final user = UserModel.fromJson(userData);
+      await _storeUser(user);
+      return user;
     } catch (e) {
       throw _handleError(e);
     }
@@ -40,7 +45,9 @@ class AuthRepository {
 
       await _storeTokens(response.data);
       final userData = _extractUserData(response.data);
-      return UserModel.fromJson(userData);
+      final user = UserModel.fromJson(userData);
+      await _storeUser(user);
+      return user;
     } catch (e) {
       throw _handleError(e);
     }
@@ -74,6 +81,7 @@ class AuthRepository {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('refresh_token');
+    await prefs.remove(_cachedUserKey);
   }
 
   /// Deletes (deactivates) the current user's account. Requires their
@@ -94,7 +102,9 @@ class AuthRepository {
   Future<UserModel> fetchProfile() async {
     try {
       final response = await apiClient.dio.get('auth/profile/');
-      return UserModel.fromJson(_extractUserData(response.data));
+      final user = UserModel.fromJson(_extractUserData(response.data));
+      await _storeUser(user);
+      return user;
     } catch (e) {
       throw _handleError(e);
     }
@@ -109,10 +119,30 @@ class AuthRepository {
         'full_name': fullName,
         if (phoneNumber != null) 'phone_number': phoneNumber,
       });
-      return UserModel.fromJson(_extractUserData(response.data));
+      final user = UserModel.fromJson(_extractUserData(response.data));
+      await _storeUser(user);
+      return user;
     } catch (e) {
       throw _handleError(e);
     }
+  }
+
+  Future<UserModel?> getCachedUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_cachedUserKey);
+    if (raw == null) return null;
+    try {
+      return UserModel.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _storeUser(UserModel user) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cachedUserKey, jsonEncode(user.toJson()));
+    } catch (_) {}
   }
 
   Future<void> _storeTokens(dynamic data) async {

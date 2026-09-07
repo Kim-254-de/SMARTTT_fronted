@@ -339,6 +339,10 @@
     </div>
   </nav>
 
+  <div id="offlineBanner" class="hidden" style="background:#fff3cd; color:#856404; padding:10px 24px; text-align:center; font-size:13px; font-weight:600; border-bottom:1px solid #ffeeba; display:flex; align-items:center; justify-content:center; gap:8px;">
+    <span>⚡ You are currently offline. Viewing cached timetable and student data.</span>
+  </div>
+
   <div class="container">
 
     <!-- Stats strip -->
@@ -447,7 +451,7 @@ async function apiFetch(path, options = {}) {
     headers['Content-Type'] = 'application/json';
   }
   const res = await fetch(API + path, { ...options, headers });
-  if (res.status === 401) { doLogout(); throw new Error('Session expired.'); }
+  if (res.status === 401 && !path.includes('login')) { doLogout(); throw new Error('Session expired.'); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
   return data;
@@ -558,45 +562,132 @@ async function doRegister() {
 // ── Logout ─────────────────────────────────────────────────────────────────
 function doLogout() {
   clearToken();
+  localStorage.removeItem('lect_cached_user');
+  localStorage.removeItem('lect_cached_profile');
+  localStorage.removeItem('lect_cached_total_students');
   document.getElementById('mainView').classList.add('hidden');
   document.getElementById('authView').classList.remove('hidden');
 }
 
+// ── Offline status & Service Worker ────────────────────────────────────────
+function updateOnlineStatus() {
+  const banner = document.getElementById('offlineBanner');
+  if (!banner) return;
+  if (!navigator.onLine) {
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+window.addEventListener('online', () => {
+  updateOnlineStatus();
+  if (getToken()) loadProfile();
+});
+window.addEventListener('offline', updateOnlineStatus);
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(err => {
+      console.warn('[SW] Registration failed:', err);
+    });
+  });
+}
+
 // ── Show main view ─────────────────────────────────────────────────────────
 function showMain(user) {
+  localStorage.setItem('lect_cached_user', JSON.stringify(user));
   document.getElementById('authView').classList.add('hidden');
   document.getElementById('mainView').classList.remove('hidden');
   document.getElementById('navName').textContent = user.full_name || user.email;
+  updateOnlineStatus();
+  renderCachedProfile();
   loadProfile();
   loadDepartments();
 }
 
 // ── Load departments for register form ─────────────────────────────────────
 async function loadDepartments() {
+  const cached = localStorage.getItem('lect_cached_departments');
+  if (cached) {
+    try {
+      populateDepartments(JSON.parse(cached));
+    } catch (_) {}
+  }
   try {
     const data = await apiFetch('core/departments/');
     const results = Array.isArray(data) ? data : (data.results || []);
-    const select = document.getElementById('regDepartment');
-    if (!select) return;
-    select.innerHTML = '<option value="">— Select department (optional) —</option>';
-    results.forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d.id;
-      opt.textContent = d.name;
-      select.appendChild(opt);
-    });
+    localStorage.setItem('lect_cached_departments', JSON.stringify(results));
+    populateDepartments(results);
   } catch (_) {}
+}
+
+function populateDepartments(results) {
+  const select = document.getElementById('regDepartment');
+  if (!select) return;
+  select.innerHTML = '<option value="">— Select department (optional) —</option>';
+  results.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.name;
+    select.appendChild(opt);
+  });
 }
 
 // ── Load profile + timetable ───────────────────────────────────────────────
 let mySlots = [];
 let myUnits = {};
 
+function renderCachedProfile() {
+  const raw = localStorage.getItem('lect_cached_profile');
+  if (!raw) return false;
+  try {
+    const data = JSON.parse(raw);
+    const slots = data.slots || [];
+    mySlots = slots;
+
+    document.getElementById('termBadge').textContent = data.current_term || 'No active term';
+
+    const unitMap = {};
+    slots.forEach(s => {
+      if (!unitMap[s.unit]) unitMap[s.unit] = { code: s.unit_code, name: s.unit_name, id: s.unit };
+    });
+    myUnits = unitMap;
+
+    document.getElementById('statUnits').textContent = Object.keys(unitMap).length;
+    document.getElementById('statSessions').textContent = slots.length;
+
+    const unitSelect = document.getElementById('notifUnit');
+    if (unitSelect) {
+      unitSelect.innerHTML = '<option value="">— Select unit —</option>';
+      Object.values(unitMap).forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = `${u.code} — ${u.name}`;
+        unitSelect.appendChild(opt);
+      });
+    }
+
+    const cachedTotal = localStorage.getItem('lect_cached_total_students');
+    if (cachedTotal !== null) {
+      document.getElementById('statStudents').textContent = cachedTotal;
+    }
+
+    renderTimetable(slots);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 async function loadProfile() {
+  const hasCached = renderCachedProfile();
+
   try {
     const data = await apiFetch('auth/lecturer/profile/');
     const slots = data.slots || [];
     mySlots = slots;
+
+    localStorage.setItem('lect_cached_profile', JSON.stringify(data));
 
     // term badge
     document.getElementById('termBadge').textContent = data.current_term || 'No active term';
@@ -628,16 +719,26 @@ async function loadProfile() {
     for (const uid of Object.keys(unitMap)) {
       try {
         const studs = await apiFetch(`auth/lecturer/students/?unit=${uid}`);
+        localStorage.setItem(`lect_cached_students_${uid}`, JSON.stringify(studs));
         total += studs.length;
-      } catch (_) {}
+      } catch (_) {
+        const cachedStuds = localStorage.getItem(`lect_cached_students_${uid}`);
+        if (cachedStuds) {
+          total += JSON.parse(cachedStuds).length;
+        }
+      }
     }
     document.getElementById('statStudents').textContent = total;
+    localStorage.setItem('lect_cached_total_students', total);
 
     // render timetable
     renderTimetable(slots);
   } catch (err) {
-    document.getElementById('timetableContent').innerHTML =
-      `<div class="alert alert-error">${err.message}</div>`;
+    updateOnlineStatus();
+    if (!hasCached) {
+      document.getElementById('timetableContent').innerHTML =
+        `<div class="alert alert-error">${err.message}</div>`;
+    }
   }
 }
 
@@ -692,16 +793,15 @@ async function showStudentsFor(unitId, unitLabel) {
 
   card.style.display = 'block';
   title.textContent = `Students — ${unitLabel}`;
-  content.innerHTML = '<div style="padding:20px;text-align:center"><div class="spinner"></div></div>';
   card.scrollIntoView({ behavior: 'smooth' });
 
-  try {
-    const students = await apiFetch(`auth/lecturer/students/?unit=${unitId}`);
+  function renderRoster(students, isOfflineCache) {
     if (students.length === 0) {
       content.innerHTML = '<div class="empty-state">No students enrolled in this unit yet.</div>';
       return;
     }
     content.innerHTML = `
+      ${isOfflineCache ? '<div class="muted" style="margin-bottom:10px; color:#c47d0e; font-weight:600;">⚡ Viewing saved student list (offline)</div>' : ''}
       <table>
         <thead><tr><th>#</th><th>Name</th><th>Admission No.</th><th>Email</th></tr></thead>
         <tbody>
@@ -716,8 +816,30 @@ async function showStudentsFor(unitId, unitLabel) {
         </tbody>
       </table>
       <div class="muted" style="margin-top:10px">${students.length} student(s) enrolled</div>`;
+  }
+
+  // 1. Immediately render cached roster if available
+  let hasCached = false;
+  const cached = localStorage.getItem(`lect_cached_students_${unitId}`);
+  if (cached) {
+    try {
+      renderRoster(JSON.parse(cached), true);
+      hasCached = true;
+    } catch (_) {}
+  }
+
+  if (!hasCached) {
+    content.innerHTML = '<div style="padding:20px;text-align:center"><div class="spinner"></div></div>';
+  }
+
+  try {
+    const students = await apiFetch(`auth/lecturer/students/?unit=${unitId}`);
+    localStorage.setItem(`lect_cached_students_${unitId}`, JSON.stringify(students));
+    renderRoster(students, false);
   } catch (err) {
-    content.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    if (!hasCached) {
+      content.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    }
   }
 }
 
@@ -732,18 +854,34 @@ async function loadStudentsForUnit() {
   const preview = document.getElementById('studentPreview');
   if (!unitId) { preview.classList.add('hidden'); return; }
 
+  // Check cached student count first
+  const cached = localStorage.getItem(`lect_cached_students_${unitId}`);
+  if (cached) {
+    try {
+      const studs = JSON.parse(cached);
+      selectedUnitStudents = studs.length;
+      document.getElementById('studentCount').textContent = studs.length;
+      preview.classList.remove('hidden');
+    } catch (_) {}
+  }
+
   try {
     const students = await apiFetch(`auth/lecturer/students/?unit=${unitId}`);
     selectedUnitStudents = students.length;
     document.getElementById('studentCount').textContent = students.length;
     preview.classList.remove('hidden');
   } catch (_) {
-    preview.classList.add('hidden');
+    if (!cached) preview.classList.add('hidden');
   }
 }
 
 // ── Send notification ──────────────────────────────────────────────────────
 async function sendNotification() {
+  if (!navigator.onLine) {
+    showAlert('notifAlert', 'Cannot send notifications while offline. Please reconnect to the internet.', 'error');
+    return;
+  }
+
   const unitId = document.getElementById('notifUnit').value;
   const title = document.getElementById('notifTitle').value.trim();
   const message = document.getElementById('notifMessage').value.trim();
@@ -779,14 +917,33 @@ async function sendNotification() {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
+updateOnlineStatus();
+
 if (getToken()) {
   document.getElementById('authView').classList.add('hidden');
   document.getElementById('mainView').classList.remove('hidden');
+
+  // Immediately display cached user and cached profile if present
+  const cachedUser = JSON.parse(localStorage.getItem('lect_cached_user') || 'null');
+  if (cachedUser) {
+    document.getElementById('navName').textContent = cachedUser.full_name || cachedUser.email;
+  }
+  renderCachedProfile();
+
   apiFetch('auth/profile/').then(user => {
+    localStorage.setItem('lect_cached_user', JSON.stringify(user));
     document.getElementById('navName').textContent = user.full_name || user.email;
     loadProfile();
     loadDepartments();
-  }).catch(doLogout);
+  }).catch(err => {
+    updateOnlineStatus();
+    // Only logout if token expired / unauthorized. If offline or network error, keep offline view!
+    if (err && err.message && err.message.includes('Session expired')) {
+      doLogout();
+    } else {
+      renderCachedProfile();
+    }
+  });
 }
 </script>
 

@@ -48,11 +48,23 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> checkAuth() async {
     final repository = ref.read(authRepositoryProvider);
     state = state.copyWith(isLoading: true, clearError: true);
+
+    // Immediately restore cached user if available (offline-first)
+    final cachedUser = await repository.getCachedUser();
+    if (cachedUser != null) {
+      state = AuthState(user: cachedUser, isLoading: false);
+    }
+
     try {
       final user = await repository.fetchProfile();
       state = AuthState(user: user, isLoading: false);
     } catch (e) {
-      state = AuthState(isLoading: false);
+      // Keep cached user if offline or network error
+      if (cachedUser != null) {
+        state = AuthState(user: cachedUser, isLoading: false);
+      } else {
+        state = AuthState(isLoading: false);
+      }
     }
   }
 
