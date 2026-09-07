@@ -90,6 +90,7 @@
   .status-msg { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
   .status-success { background: var(--success-bg); color: var(--success); }
   .status-error { background: var(--danger-bg); color: var(--danger); }
+  .status-warning { background: var(--warning-bg); color: var(--warning); }
   .hidden { display: none; }
   .muted { color: var(--text-muted); font-size: 12.5px; }
   .upload-progress { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
@@ -151,7 +152,7 @@
       <button onclick="uploadTimetable()" id="uploadBtn">Upload and process</button>
       <div class="upload-progress hidden" id="uploadProgress">
         <div class="spinner"></div>
-        <span class="muted">Processing rows — this can take a moment for large files…</span>
+        <span class="muted" id="uploadProgressText">Processing rows in background…</span>
       </div>
       <div id="uploadErrors" class="errors-box hidden"></div>
     </div>
@@ -315,7 +316,7 @@ function showStatus(elId, message, type) {
     return;
   }
   el.innerHTML = `<div class="status-msg status-${type}">${message}</div>`;
-  if (type === 'success') setTimeout(() => { el.innerHTML = ''; }, 4000);
+  if (type === 'success') setTimeout(() => { el.innerHTML = ''; }, 5000);
 }
 
 function parseErrorMessage(data) {
@@ -398,7 +399,9 @@ function showAdminView() {
   document.getElementById('adminView').classList.remove('hidden');
 }
 
-// ───────────────── Upload ─────────────────
+// ───────────────── Upload with Polling ─────────────────
+
+let uploadPollTimer = null;
 
 async function uploadTimetable() {
   const fileInput = document.getElementById('fileInput');
@@ -410,43 +413,81 @@ async function uploadTimetable() {
 
   const btn = document.getElementById('uploadBtn');
   const progress = document.getElementById('uploadProgress');
+  const progressText = document.getElementById('uploadProgressText');
   const errorsBox = document.getElementById('uploadErrors');
+  
   errorsBox.classList.add('hidden');
   errorsBox.innerHTML = '';
   btn.disabled = true;
   progress.classList.remove('hidden');
+  progressText.textContent = 'Uploading file and initiating background parser…';
 
   try {
     const formData = new FormData();
     formData.append('file', file);
-    const data = await apiFetch('timetable/upload/', {
+
+    // Submits and receives 202 Accepted immediately
+    const res = await apiFetch('timetable/upload/', {
       method: 'POST',
       body: formData,
     });
 
-    const rowsSaved = data.rows_saved ?? 0;
-    const rowsReceived = data.rows_received ?? data.total_rows ?? rowsSaved;
-    const rowsFailed = data.rows_failed ?? 0;
-
-    const summary = `Processed: ${rowsReceived} received, ${rowsSaved} saved, ${rowsFailed} failed.`;
-    showStatus('uploadStatus', summary, rowsFailed > 0 ? 'error' : 'success');
-
-    if (data.errors && data.errors.length > 0) {
-      errorsBox.classList.remove('hidden');
-      errorsBox.innerHTML = data.errors
-        .slice(0, 50)
-        .map(e => `<div>Row ${e.row || e.row_number || '?'}: ${e.error || JSON.stringify(e)}</div>`)
-        .join('');
+    const batchId = res.upload_batch_id || res.batch_id;
+    if (!batchId) {
+      // Fallback if backend returned immediate synchronous result
+      const rowsSaved = res.rows_saved ?? 0;
+      const rowsReceived = res.rows_received ?? res.total_rows ?? rowsSaved;
+      showStatus('uploadStatus', `Processed: ${rowsReceived} received, ${rowsSaved} saved.`, 'success');
+      btn.disabled = false;
+      progress.classList.add('hidden');
+      fileInput.value = '';
+      loadUploads();
+      loadTerms();
+      return;
     }
 
-    fileInput.value = '';
-    loadUploads();
-    loadTerms();
+    showStatus('uploadStatus', 'File uploaded. Processing pages in background…', 'success');
+    progressText.textContent = 'Extracting PDF tables & writing database slots…';
+
+    // Poll status endpoint
+    if (uploadPollTimer) clearInterval(uploadPollTimer);
+    uploadPollTimer = setInterval(async () => {
+      try {
+        const batch = await apiFetch(`timetable/upload/${batchId}/status/`);
+        
+        if (batch.status === 'processing') {
+          if (batch.rows_received > 0) {
+            progressText.textContent = `Parsed ${batch.rows_received} rows. Writing slots to database…`;
+          }
+        } else if (batch.status === 'processed' || batch.status === 'partial') {
+          clearInterval(uploadPollTimer);
+          btn.disabled = false;
+          progress.classList.add('hidden');
+          
+          const summary = `Complete: ${batch.rows_saved || 0} saved, ${batch.rows_failed || 0} failed out of ${batch.rows_received || 0} rows.`;
+          showStatus('uploadStatus', summary, batch.rows_failed > 0 ? 'warning' : 'success');
+          fileInput.value = '';
+          loadUploads();
+          loadTerms();
+        } else if (batch.status === 'failed') {
+          clearInterval(uploadPollTimer);
+          btn.disabled = false;
+          progress.classList.add('hidden');
+          showStatus('uploadStatus', 'Upload processing failed. Check server logs.', 'error');
+          loadUploads();
+        }
+      } catch (err) {
+        clearInterval(uploadPollTimer);
+        btn.disabled = false;
+        progress.classList.add('hidden');
+        showStatus('uploadStatus', `Monitoring error: ${err.message}`, 'error');
+      }
+    }, 2500);
+
   } catch (err) {
-    showStatus('uploadStatus', err.message, 'error');
-  } finally {
     btn.disabled = false;
     progress.classList.add('hidden');
+    showStatus('uploadStatus', err.message, 'error');
   }
 }
 
