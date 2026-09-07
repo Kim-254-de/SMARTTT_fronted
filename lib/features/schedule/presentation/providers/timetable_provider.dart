@@ -1,5 +1,5 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/network/error_message.dart';
 import '../../data/timetable_repository.dart';
 import '../../domain/models/timetable_session_model.dart';
 
@@ -104,7 +104,14 @@ class TimetableNotifier extends Notifier<TimetableState> {
       if (state.sessions.isNotEmpty) {
         state = state.copyWith(isLoading: false, isFromCache: true);
       } else {
-        state = state.copyWith(isLoading: false, error: e.toString());
+        state = state.copyWith(
+          isLoading: false,
+          error: parseErrorMessage(
+            e,
+            fallbackMessage:
+                'No registered units found. Use Sync to update your schedule.',
+          ),
+        );
       }
     }
   }
@@ -126,21 +133,13 @@ class TimetableNotifier extends Notifier<TimetableState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        error: _portalSyncErrorMessage(e),
+        error: parseErrorMessage(
+          e,
+          fallbackMessage: 'Sync failed. Please try again.',
+        ),
       );
       return false;
     }
-  }
-
-  String _portalSyncErrorMessage(Object error) {
-    if (error is DioException && error.response?.statusCode == 400) {
-      final data = error.response?.data;
-      if (data is Map && data['detail'] is String) {
-        return data['detail'] as String;
-      }
-      return 'Invalid portal password or no registered units found for this term.';
-    }
-    return 'Sync failed. Please try again.';
   }
 
   /// Manual fallback if portal scraping is unavailable.

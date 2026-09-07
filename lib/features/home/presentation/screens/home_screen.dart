@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,9 +33,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   List<Widget> get _screens => [
-    _HomeTab(
-      onViewSchedule: () => _onItemTapped(1),
-    ),
+    _HomeTab(onViewSchedule: () => _onItemTapped(1)),
     const ScheduleScreen(),
     const ProfileScreen(),
   ];
@@ -47,19 +44,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
- @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
       floatingActionButton: _selectedIndex == 2
           ? null
           : FloatingActionButton.extended(
-              onPressed: () => context.push('/portal-sync'),
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
-              icon: const Icon(Iconsax.refresh),
-              label: const Text('Sync'),
-            ).animate().fadeIn(duration: 300.ms).scale(begin: const Offset(0.8, 0.8)),
+                  onPressed: () => context.push('/portal-sync'),
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  icon: const Icon(Iconsax.refresh),
+                  label: const Text('Sync'),
+                )
+                .animate()
+                .fadeIn(duration: 300.ms)
+                .scale(begin: const Offset(0.8, 0.8)),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         selectedItemColor: AppTheme.primary,
@@ -69,10 +69,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Iconsax.home),
-            label: 'Home',
-          ),
+          BottomNavigationBarItem(icon: Icon(Iconsax.home), label: 'Home'),
           BottomNavigationBarItem(
             icon: Icon(Iconsax.calendar),
             label: 'Schedule',
@@ -90,7 +87,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 class _HomeTab extends ConsumerWidget {
   final VoidCallback onViewSchedule;
 
-  const _HomeTab({super.key, required this.onViewSchedule});
+  const _HomeTab({required this.onViewSchedule});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -146,7 +143,8 @@ class _HomeTab extends ConsumerWidget {
         final parts = session.timeRange.split('-');
         if (parts.length == 2) {
           final endParts = parts[1].trim().split(':');
-          final endMinutes = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+          final endMinutes =
+              int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
           if (nowMinutes > endMinutes) {
             completedCount++;
           } else {
@@ -159,11 +157,11 @@ class _HomeTab extends ConsumerWidget {
     }
 
     final cardColors = const [
-  AppTheme.primary,
-  AppTheme.secondary,
-  AppTheme.accent,
-  Color(0xFF1A6B3A),   // deep green — kept for variety, not brand
-];
+      AppTheme.primary,
+      AppTheme.secondary,
+      AppTheme.accent,
+      Color(0xFF1A6B3A), // deep green — kept for variety, not brand
+    ];
 
     return Scaffold(
       backgroundColor: AppTheme.getBackground(context),
@@ -174,7 +172,7 @@ class _HomeTab extends ConsumerWidget {
           padding: const EdgeInsets.all(8.0),
           child: Container(
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.1),
+              color: AppTheme.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -187,60 +185,58 @@ class _HomeTab extends ConsumerWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              greeting,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            Text(greeting, style: Theme.of(context).textTheme.bodyMedium),
             Text(
               user?.fullName ?? 'Student Name',
               style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
         actions: [
-         
-Consumer(
-  builder: (context, ref, _) {
-    final unread = ref.watch(notificationProvider).unreadCount;
-    return Stack(
-      children: [
-        IconButton(
-          onPressed: () => context.pushNamed('alerts'),
-          icon: Icon(
-            Iconsax.notification,
-            color: AppTheme.getTextPrimary(context),
+          Consumer(
+            builder: (context, ref, _) {
+              final unread = ref.watch(notificationProvider).unreadCount;
+              return Stack(
+                children: [
+                  IconButton(
+                    onPressed: () => context.pushNamed('alerts'),
+                    icon: Icon(
+                      Iconsax.notification,
+                      color: AppTheme.getTextPrimary(context),
+                    ),
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: AppTheme.accent,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          unread > 99 ? '99+' : '$unread',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
-        ),
-        if (unread > 0)
-          Positioned(
-            right: 8,
-            top: 8,
-            child: Container(
-              padding: const EdgeInsets.all(2),
-              decoration: const BoxDecoration(
-                color: AppTheme.accent,
-                shape: BoxShape.circle,
-              ),
-              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-              child: Text(
-                unread > 99 ? '99+' : '$unread',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-      ],
-    );
-  },
-),
- 
         ],
       ),
       body: RefreshIndicator(
@@ -321,15 +317,18 @@ Consumer(
                   Text(
                     "Today's Schedule",
                     style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   TextButton(
                     onPressed: onViewSchedule,
                     child: const Text(
                       'View All',
-                      style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -339,12 +338,12 @@ Consumer(
 
               // Timetable Cards
               _buildTodayScheduleSection(
-                timetableState, 
-                classesToday, 
-                nowMinutes, 
-                cardColors
+                timetableState,
+                classesToday,
+                nowMinutes,
+                cardColors,
               ),
-              
+
               const SizedBox(height: 32),
             ],
           ),
@@ -354,10 +353,10 @@ Consumer(
   }
 
   Widget _buildTodayScheduleSection(
-    TimetableState state, 
-    List<TimetableSessionModel> sessions, 
-    int nowMinutes, 
-    List<Color> cardColors
+    TimetableState state,
+    List<TimetableSessionModel> sessions,
+    int nowMinutes,
+    List<Color> cardColors,
   ) {
     if (state.isLoading) {
       return const Center(
@@ -371,24 +370,24 @@ Consumer(
     if (state.error != null) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.error.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
           children: [
-            const Icon(Iconsax.danger, color: AppTheme.error, size: 36),
-            const SizedBox(height: 12),
-            Text(
-              'Error loading schedule',
-              style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.bold),
+            const Icon(Icons.calendar_today_rounded, color: Colors.blueAccent, size: 32),
+            const SizedBox(height: 8),
+            const Text(
+              'Schedule Unavailable',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 4),
             Text(
               state.error!,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppTheme.error, fontSize: 12),
+              style: const TextStyle(color: Colors.black87, fontSize: 13),
             ),
           ],
         ),
@@ -400,15 +399,15 @@ Consumer(
         width: double.infinity,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: AppTheme.primary.withOpacity(0.05),
+          color: AppTheme.primary.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
+          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.1)),
         ),
         child: const Center(
           child: Column(
             children: [
               Icon(Iconsax.coffee, color: AppTheme.primary, size: 36),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Text(
                 'No classes scheduled for today',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
@@ -436,9 +435,11 @@ Consumer(
           if (parts.length == 2) {
             final startParts = parts[0].trim().split(':');
             final endParts = parts[1].trim().split(':');
-            final startMinutes = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
-            final endMinutes = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
-            
+            final startMinutes =
+                int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
+            final endMinutes =
+                int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+
             if (nowMinutes > endMinutes) {
               isCompleted = true;
             } else if (nowMinutes >= startMinutes && nowMinutes <= endMinutes) {
