@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/timetable_repository.dart';
 import '../../domain/models/timetable_session_model.dart';
@@ -123,9 +124,23 @@ class TimetableNotifier extends Notifier<TimetableState> {
       await fetchMySchedule();
       return true;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(
+        isLoading: false,
+        error: _portalSyncErrorMessage(e),
+      );
       return false;
     }
+  }
+
+  String _portalSyncErrorMessage(Object error) {
+    if (error is DioException && error.response?.statusCode == 400) {
+      final data = error.response?.data;
+      if (data is Map && data['detail'] is String) {
+        return data['detail'] as String;
+      }
+      return 'Invalid portal password or no registered units found for this term.';
+    }
+    return 'Sync failed. Please try again.';
   }
 
   /// Manual fallback if portal scraping is unavailable.
