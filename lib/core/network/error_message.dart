@@ -10,14 +10,37 @@ String parseErrorMessage(
       return 'Unable to reach the server. Please check your connection and try again.';
     }
 
-    if (error.response?.statusCode == 400) {
-      final data = error.response?.data;
-      if (data is Map && data['detail'] is String) {
-        return data['detail'] as String;
+    final data = error.response?.data;
+    final serverMessage = _extractServerMessage(data);
+    if (serverMessage != null) {
+      final normalized = serverMessage.toLowerCase();
+      if (normalized.contains('credential') ||
+          normalized.contains('password') ||
+          normalized.contains('admission number')) {
+        return 'The portal admission number or password is incorrect.';
       }
-      return 'Invalid portal credentials or no registered units found.';
+      if (normalized.contains('no registered') ||
+          normalized.contains('units are available') ||
+          normalized.contains('units found')) {
+        return 'No registered units are available for this semester. '
+            'Please confirm your units are registered on the portal.';
+      }
+      return serverMessage;
     }
   }
 
   return fallbackMessage;
+}
+
+String? _extractServerMessage(dynamic data) {
+  if (data is String && data.trim().isNotEmpty) return data.trim();
+  if (data is! Map) return null;
+
+  for (final key in ['detail', 'message', 'error']) {
+    final value = data[key];
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    if (value is List && value.isNotEmpty) return value.first.toString();
+  }
+
+  return null;
 }
