@@ -176,20 +176,35 @@ class AuthRepository {
         if (data.containsKey('message')) return Exception(data['message'].toString());
         final first = data.values.first;
         if (first is List && first.isNotEmpty) return Exception(first.first.toString());
-        return Exception(data.toString());
+        return Exception('Please check the information you entered and try again.');
       }
       if (statusCode != null) {
         if (statusCode >= 500) {
-          return Exception('Server error ($statusCode). Please try again later.');
+          return Exception('The server is temporarily unavailable. Please try again later.');
         } else if (statusCode == 400) {
-          return Exception('Bad request (400). Please check your input.');
+          return Exception('Please check the information you entered and try again.');
+        } else if (statusCode == 401) {
+          final isLogin = e.requestOptions.path.contains('auth/login');
+          return Exception(
+            isLogin
+                ? 'The email or password is incorrect.'
+                : 'Your session has expired. Please sign in again.',
+          );
         } else if (statusCode == 403) {
-          return Exception('Access denied (403).');
+          return Exception('You do not have permission to perform this action.');
         } else if (statusCode == 404) {
-          return Exception('Endpoint not found (404).');
+          return Exception('We could not find what you requested. Please try again.');
         }
       }
-      return Exception(e.message ?? 'Network error. Please try again.');
+      if (e.type == DioExceptionType.connectionError) {
+        return Exception('Unable to reach the server. Please check your connection and try again.');
+      }
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        return Exception('The request took too long. Please try again.');
+      }
+      return Exception('Something went wrong. Please try again.');
     }
     if (e is Exception) return e;
     return Exception(e.toString());
