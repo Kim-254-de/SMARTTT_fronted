@@ -38,7 +38,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
 
  Future<void> subscribeCalendar() async {
   final uri = Uri.parse(
-    'https://smarttt-backend-n44z.onrender.com/api/v1/schedule/calendar.ics',
+    'https://api.nextup.co.ke/api/v1/schedule/calendar.ics',
   );
 
   await launchUrl(
@@ -165,14 +165,28 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                 padding: EdgeInsets.only(top: 48),
                 child: Center(child: CircularProgressIndicator()),
               )
-            else if (state.error != null && state.sessions.isEmpty)
-              _EmptyState(
-                icon: Icons.error_outline,
-                title: 'Failed to load timetable',
-                message: state.error!,
-                actionLabel: 'Retry',
-                onAction: () => ref.read(timetableProvider.notifier).fetchMySchedule(),
-              )
+            else if (state.error != null && state.sessions.isEmpty) ...[
+              () {
+                final isAuth = state.error!.contains('401') || state.error!.toLowerCase().contains('unauthorized');
+                return _EmptyState(
+                  icon: isAuth ? Icons.lock_clock_outlined : Icons.error_outline,
+                  title: isAuth ? 'Session Expired' : 'Failed to load timetable',
+                  message: isAuth
+                      ? 'Your session has expired. Please log in again to view your schedule.'
+                      : (state.error!.contains('connection')
+                          ? 'Unable to connect to server. Check your network connection.'
+                          : 'Something went wrong while fetching your schedule.'),
+                  actionLabel: isAuth ? 'Log In' : 'Retry',
+                  onAction: () {
+                    if (isAuth) {
+                      context.go('/login');
+                    } else {
+                      ref.read(timetableProvider.notifier).fetchMySchedule();
+                    }
+                  },
+                );
+              }(),
+            ]
             else if (sessions.isEmpty)
               const _EmptyState(
                 icon: Icons.event_busy_outlined,

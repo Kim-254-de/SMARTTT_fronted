@@ -368,26 +368,63 @@ class _HomeTab extends ConsumerWidget {
     }
 
     if (state.error != null) {
+      final isAuthError = state.error!.contains('401') || state.error!.toLowerCase().contains('unauthorized');
+      final cleanMessage = isAuthError
+          ? 'Your session has expired. Please log in again.'
+          : (state.error!.contains('SocketException') || state.error!.contains('connection')
+              ? 'Network error. Please check your internet connection.'
+              : 'Unable to load today\'s schedule. Tap to retry.');
+
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+        margin: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.blue.shade50,
-          borderRadius: BorderRadius.circular(12),
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.red.shade100),
         ),
         child: Column(
           children: [
-            const Icon(Icons.calendar_today_rounded, color: Colors.blueAccent, size: 32),
-            const SizedBox(height: 8),
-            const Text(
-              'Schedule Unavailable',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            Icon(
+              isAuthError ? Icons.lock_clock_outlined : Icons.error_outline_rounded,
+              color: Colors.red.shade400,
+              size: 36,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 10),
             Text(
-              state.error!,
+              isAuthError ? 'Session Expired' : 'Unable to Load Schedule',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Colors.red.shade900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              cleanMessage,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.black87, fontSize: 13),
+              style: TextStyle(fontSize: 13, color: Colors.red.shade700),
+            ),
+            const SizedBox(height: 14),
+            TextButton.icon(
+              onPressed: () {
+                if (isAuthError) {
+                  context.go('/login');
+                } else {
+                  ref.read(timetableProvider.notifier).fetchMySchedule();
+                }
+              },
+              icon: Icon(isAuthError ? Icons.login : Icons.refresh_rounded, size: 16),
+              label: Text(isAuthError ? 'Log In' : 'Try Again'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red.shade900,
+                backgroundColor: Colors.red.shade100,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
             ),
           ],
         ),

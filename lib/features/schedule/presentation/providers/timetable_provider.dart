@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/error_message.dart';
 import '../../data/timetable_repository.dart';
@@ -68,6 +69,30 @@ class TimetableNotifier extends Notifier<TimetableState> {
     return TimetableState();
   }
 
+  String _formatError(dynamic e, {String? fallback}) {
+    if (e is DioException) {
+      final statusCode = e.response?.statusCode;
+      if (statusCode == 401) {
+        return 'Your session has expired. Please log in again.';
+      } else if (statusCode == 403) {
+        return 'You do not have permission to view this timetable.';
+      } else if (statusCode == 404) {
+        return fallback ?? 'No schedule found for the current term.';
+      } else if (statusCode != null && statusCode >= 500) {
+        return 'Server is temporarily unavailable. Please try again shortly.';
+      } else if (e.type == DioExceptionType.connectionError ||
+                 e.type == DioExceptionType.connectionTimeout ||
+                 e.type == DioExceptionType.receiveTimeout ||
+                 e.type == DioExceptionType.sendTimeout) {
+        return 'Unable to connect. Please check your internet connection.';
+      }
+    }
+    return parseErrorMessage(
+      e,
+      fallbackMessage: fallback ?? 'Unable to load schedule. Please try again.',
+    );
+  }
+
   /// Fetches the student's personalised, already-matched timetable.
   /// Backend handles term resolution, unit matching, and grouping.
   /// Seamlessly displays cached schedule if offline.
@@ -106,10 +131,9 @@ class TimetableNotifier extends Notifier<TimetableState> {
       } else {
         state = state.copyWith(
           isLoading: false,
-          error: parseErrorMessage(
+          error: _formatError(
             e,
-            fallbackMessage:
-                'No registered units found. Use Sync to update your schedule.',
+            fallback: 'No registered units found. Use Sync to update your schedule.',
           ),
         );
       }
@@ -133,9 +157,9 @@ class TimetableNotifier extends Notifier<TimetableState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        error: parseErrorMessage(
+        error: _formatError(
           e,
-          fallbackMessage: 'Sync failed. Please try again.',
+          fallback: 'Sync failed. Please try again.',
         ),
       );
       return false;
@@ -150,7 +174,13 @@ class TimetableNotifier extends Notifier<TimetableState> {
       await fetchMySchedule();
       return true;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(
+        isLoading: false,
+        error: _formatError(
+          e,
+          fallback: 'Failed to sync units manually. Please check your unit codes.',
+        ),
+      );
       return false;
     }
   }
