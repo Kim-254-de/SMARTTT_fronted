@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../domain/models/timetable_session_model.dart';
 import 'providers/timetable_provider.dart';
+import 'package:go_router/go_router.dart';
 
 class ScheduleScreen extends ConsumerStatefulWidget {
   const ScheduleScreen({Key? key}) : super(key: key);

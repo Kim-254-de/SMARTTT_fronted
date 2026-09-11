@@ -160,7 +160,7 @@ class _HomeTab extends ConsumerWidget {
       AppTheme.primary,
       AppTheme.secondary,
       AppTheme.accent,
-      Color(0xFF1A6B3A), // deep green — kept for variety, not brand
+      Color(0xFF1A6B3A),
     ];
 
     return Scaffold(
@@ -338,6 +338,8 @@ class _HomeTab extends ConsumerWidget {
 
               // Timetable Cards
               _buildTodayScheduleSection(
+                context,
+                ref,
                 timetableState,
                 classesToday,
                 nowMinutes,
@@ -353,6 +355,8 @@ class _HomeTab extends ConsumerWidget {
   }
 
   Widget _buildTodayScheduleSection(
+    BuildContext context,
+    WidgetRef ref,
     TimetableState state,
     List<TimetableSessionModel> sessions,
     int nowMinutes,
