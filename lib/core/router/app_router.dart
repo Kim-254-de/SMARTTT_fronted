@@ -16,6 +16,7 @@ import '../../features/schedule/presentation/schedule_screen.dart';
 import '../../features/schedule/presentation/portal_sync_screen.dart';
 import '../../features/schedule/presentation/manual_sync_screen.dart';
 import '../../features/alerts/presentation/alerts_screen.dart';
+import '../../features/lecturer/presentation/screens/lecturer_shell_screen.dart';
 
 /// A [ChangeNotifier] that listens to [AuthNotifier] and triggers
 /// GoRouter to re-evaluate redirects whenever auth state changes.
@@ -73,6 +74,11 @@ GoRouter createRouter(Ref ref) {
         builder: (context, state) => const HomeScreen(),
       ),
       GoRoute(
+        path: '/lecturer/home',
+        name: 'lecturer-home',
+        builder: (context, state) => const LecturerShellScreen(),
+      ),
+      GoRoute(
         path: '/schedule',
         name: 'schedule',
         builder: (context, state) => const ScheduleScreen(),
@@ -124,9 +130,19 @@ GoRouter createRouter(Ref ref) {
       if (!isAuthenticated) {
         if (!isAuthEntry && !isPublicPolicyPage) return '/login';
         return null;
-      } else {
-        if (isAuthEntry) return '/home';
       }
+
+      final isLecturer = authState.user?.role == 'lecturer';
+      final roleHome = isLecturer ? '/lecturer/home' : '/home';
+
+      if (isAuthEntry) return roleHome;
+
+      // Keep each role inside its own home area — a lecturer landing on the
+      // student shell (or vice versa) gets bounced to their own home.
+      final studentOnlyRoutes = ['/home', '/schedule', '/portal-sync', '/manual-sync'];
+      if (isLecturer && studentOnlyRoutes.contains(state.matchedLocation)) return '/lecturer/home';
+      if (!isLecturer && state.matchedLocation == '/lecturer/home') return '/home';
+
       return null;
     },
   );
