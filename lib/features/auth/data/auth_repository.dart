@@ -40,7 +40,7 @@ class AuthRepository {
         'email': email,
         'password': password,
         if (universityId != null && universityId.isNotEmpty)
-          'university_id': universityId,
+          'admission_number': universityId,
       });
 
       await _storeTokens(response.data);
@@ -113,11 +113,19 @@ class AuthRepository {
   Future<UserModel> updateProfile({
     required String fullName,
     String? phoneNumber,
+    String? admissionNumber,
+    String? course,
+    String? department,
+    int? yearOfStudy,
   }) async {
     try {
       final response = await apiClient.dio.patch('auth/profile/', data: {
         'full_name': fullName,
         if (phoneNumber != null) 'phone_number': phoneNumber,
+        if (admissionNumber != null) 'admission_number': admissionNumber,
+        if (course != null) 'course': course,
+        if (department != null) 'department': department,
+        if (yearOfStudy != null) 'year_of_study': yearOfStudy,
       });
       final user = UserModel.fromJson(_extractUserData(response.data));
       await _storeUser(user);

@@ -8,7 +8,7 @@ import '../../notifications/providers/notification_provider.dart';
 import '../../notifications/domain/notification_model.dart';
 
 class AlertsScreen extends ConsumerStatefulWidget {
-  const AlertsScreen({Key? key}) : super(key: key);
+  const AlertsScreen({super.key});
 
   @override
   ConsumerState<AlertsScreen> createState() => _AlertsScreenState();
@@ -99,7 +99,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
             Icon(
               Iconsax.notification,
               size: 64,
-              color: AppTheme.getTextSecondary(context).withOpacity(0.3),
+              color: AppTheme.getTextSecondary(context).withValues(alpha: 0.3),
             ),
             const SizedBox(height: 16),
             Text(
@@ -236,12 +236,12 @@ class _NotificationCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: isUnread
-            ? AppTheme.primary.withOpacity(0.05)
+            ? AppTheme.primary.withValues(alpha: 0.05)
             : AppTheme.getSurface(context),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isUnread
-              ? AppTheme.primary.withOpacity(0.2)
+              ? AppTheme.primary.withValues(alpha: 0.2)
               : AppTheme.getBorder(context),
         ),
       ),
@@ -300,7 +300,7 @@ class _NotificationCard extends StatelessWidget {
                       _timeAgo(notification.sentAt),
                       style: TextStyle(
                         fontSize: 11,
-                        color: AppTheme.getTextSecondary(context).withOpacity(0.6),
+                        color: AppTheme.getTextSecondary(context).withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -337,6 +337,10 @@ class _NotificationIcon extends StatelessWidget {
         icon = Iconsax.calendar_edit;
         color = AppTheme.primary;
         break;
+      case 'class_reminder':
+        icon = Iconsax.clock;
+        color = AppTheme.accent;
+        break;
       case 'sync_reminder':
         icon = Iconsax.refresh;
         color = AppTheme.accent;
@@ -354,7 +358,7 @@ class _NotificationIcon extends StatelessWidget {
       width: 42,
       height: 42,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Icon(icon, color: color, size: 20),

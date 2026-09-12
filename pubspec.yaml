@@ -48,6 +48,7 @@ dependencies:
   dio: ^5.9.2
   shared_preferences: ^2.5.2
   url_launcher: ^6.3.0
+  device_calendar: 4.3.3
 
 dev_dependencies:
   flutter_test:

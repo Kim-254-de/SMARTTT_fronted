@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/notification_repository.dart';
 import '../domain/notification_model.dart';
+import '../services/fcm_service.dart';
 
 class NotificationState {
   final bool isLoading;
@@ -36,6 +37,7 @@ final notificationRepositoryProvider =
 class NotificationNotifier extends Notifier<NotificationState> {
   @override
   NotificationState build() {
+    FCMService.messageEvents.listen((_) => fetchNotifications());
     Future.microtask(() => fetchNotifications());
     return NotificationState();
   }
@@ -45,7 +47,7 @@ class NotificationNotifier extends Notifier<NotificationState> {
     try {
       final repo = ref.read(notificationRepositoryProvider);
       final notifications = await repo.fetchMyNotifications();
-      final unread = notifications.where((n) => !n.isRead).length;
+      final unread = await repo.fetchUnreadCount();
       state = NotificationState(
         notifications: notifications,
         unreadCount: unread,

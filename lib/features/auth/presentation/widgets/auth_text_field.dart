@@ -7,6 +7,7 @@ class AuthTextField extends StatefulWidget {
   final IconData icon;
   final bool isPassword;
   final TextEditingController? controller;
+  final TextInputType? keyboardType;
 
   const AuthTextField({
     super.key,
@@ -14,6 +15,7 @@ class AuthTextField extends StatefulWidget {
     required this.icon,
     this.isPassword = false,
     this.controller,
+    this.keyboardType,
   });
 
   @override
@@ -27,8 +29,10 @@ class _AuthTextFieldState extends State<AuthTextField> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
-    final backgroundColor = isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight;
+
+    final backgroundColor = isDark
+        ? AppTheme.surfaceDark
+        : AppTheme.surfaceLight;
     final borderColor = isDark ? AppTheme.borderDark : AppTheme.borderLight;
     final textColor = isDark ? Colors.white : AppTheme.textPrimaryLight;
     final hintColor = isDark ? Colors.white70 : AppTheme.textSecondaryLight;
@@ -41,6 +45,7 @@ class _AuthTextFieldState extends State<AuthTextField> {
       ),
       child: TextField(
         controller: widget.controller,
+        keyboardType: widget.keyboardType,
         obscureText: widget.isPassword ? _obscureText : false,
         style: TextStyle(color: textColor),
         cursorColor: theme.colorScheme.primary,
@@ -67,9 +72,15 @@ class _AuthTextFieldState extends State<AuthTextField> {
           enabledBorder: InputBorder.none,
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+            borderSide: BorderSide(
+              color: theme.colorScheme.primary,
+              width: 1.5,
+            ),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 18,
+          ),
         ),
       ),
     );

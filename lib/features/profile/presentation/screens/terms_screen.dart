@@ -3,7 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class TermsScreen extends StatelessWidget {
-  const TermsScreen({Key? key}) : super(key: key);
+  const TermsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

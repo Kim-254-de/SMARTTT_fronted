@@ -58,6 +58,7 @@ class AuthNotifier extends Notifier<AuthState> {
     try {
       final user = await repository.fetchProfile();
       state = AuthState(user: user, isLoading: false);
+      Future.microtask(() => FCMService.registerToken());
     } catch (e) {
       // Keep cached user if offline or network error
       if (cachedUser != null) {
@@ -88,7 +89,6 @@ class AuthNotifier extends Notifier<AuthState> {
   }) async {
     final repository = ref.read(authRepositoryProvider);
     state = state.copyWith(isLoading: true, clearError: true);
-    Future.microtask(() => FCMService.registerToken());
     try {
       final user = await repository.register(
         fullName: fullName,
@@ -97,6 +97,7 @@ class AuthNotifier extends Notifier<AuthState> {
         universityId: universityId,
       );
       state = AuthState(user: user, isLoading: false);
+      Future.microtask(() => FCMService.registerToken());
     } catch (e) {
       state = AuthState(isLoading: false, error: _extractErrorMessage(e));
     }
@@ -127,6 +128,10 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> updateProfile({
     required String fullName,
     String? phoneNumber,
+    String? admissionNumber,
+    String? course,
+    String? department,
+    int? yearOfStudy,
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
@@ -134,6 +139,10 @@ class AuthNotifier extends Notifier<AuthState> {
       final user = await repository.updateProfile(
         fullName: fullName,
         phoneNumber: phoneNumber,
+        admissionNumber: admissionNumber,
+        course: course,
+        department: department,
+        yearOfStudy: yearOfStudy,
       );
       state = state.copyWith(user: user, isLoading: false);
     } catch (e) {

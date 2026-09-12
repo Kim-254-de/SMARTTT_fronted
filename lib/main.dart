@@ -10,10 +10,12 @@ import 'core/router/app_router.dart';
 import 'core/theme/theme_provider.dart';
 import 'core/theme/locale_provider.dart';
 import 'firebase_options.dart';
+import 'features/notifications/services/fcm_service.dart';
  
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await FCMService.initialize();
   runApp(const ProviderScope(child: SmartApp()));
 }
  
