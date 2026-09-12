@@ -129,6 +129,11 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 }
-
+/// Set by RoleSelectScreen (the very first screen at '/') when the person
+/// taps "Student" or "Lecturer". Read by RegisterScreen to preselect the
+/// matching tab, and by LoginScreen for contextual heading text. Purely a
+/// UX convenience — the backend still auto-detects the actual role from
+/// whichever account logs in, this never gates access.
+final selectedRoleProvider = StateProvider<String>((ref) => 'student');
 final authRepositoryProvider = Provider((ref) => AuthRepository());
 final authProvider = NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);

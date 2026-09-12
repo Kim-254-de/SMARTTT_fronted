@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/role_select_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
@@ -40,7 +41,7 @@ GoRouter createRouter(Ref ref) {
   final notifier = ref.read(authRouterNotifierProvider);
 
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/',
     refreshListenable: notifier,
     routes: [
       GoRoute(
@@ -52,6 +53,11 @@ GoRouter createRouter(Ref ref) {
         path: '/privacy',
         name: 'privacy',
         builder: (context, state) => const PrivacyScreen(),
+      ),
+        GoRoute(
+        path: '/',
+        name: 'role-select',
+        builder: (context, state) => const RoleSelectScreen(),
       ),
       GoRoute(
         path: '/login',
@@ -72,6 +78,11 @@ GoRouter createRouter(Ref ref) {
         path: '/home',
         name: 'home',
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: '/role-select',
+        name: 'role-select',
+        builder: (context, state) => const RoleSelectScreen(),
       ),
       GoRoute(
         path: '/lecturer/home',
@@ -116,7 +127,8 @@ GoRouter createRouter(Ref ref) {
     ],
     redirect: (context, state) {
       final authState = ref.read(authProvider);
-      final isAuthEntry = state.matchedLocation == '/login' ||
+      final isAuthEntry = state.matchedLocation == '/' ||
+          state.matchedLocation == '/login' ||
           state.matchedLocation == '/register' ||
           state.matchedLocation == '/forgot-password';
       final isPublicPolicyPage = state.matchedLocation == '/terms' ||
