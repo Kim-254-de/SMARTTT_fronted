@@ -17,6 +17,7 @@ import '../../features/schedule/presentation/schedule_screen.dart';
 import '../../features/schedule/presentation/portal_sync_screen.dart';
 import '../../features/schedule/presentation/manual_sync_screen.dart';
 import '../../features/alerts/presentation/alerts_screen.dart';
+import '../../features/schedule/presentation/student_preferences_screen.dart';
 
 /// A [ChangeNotifier] that listens to [AuthNotifier] and triggers
 /// GoRouter to re-evaluate redirects whenever auth state changes.
@@ -109,6 +110,11 @@ GoRouter createRouter(Ref ref) {
         path: '/support',
         name: 'support',
         builder: (context, state) => const SupportScreen(),
+      ),
+      GoRoute(
+        path: '/student-preferences',
+        name: 'student-preferences',
+        builder: (context, state) => const StudentPreferencesScreen(),
       ),
       GoRoute(
         path: '/alerts',
