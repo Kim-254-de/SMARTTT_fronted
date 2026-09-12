@@ -11,6 +11,6 @@ class LecturerColors {
   static const Color greenBg = Color(0xFFE3F6EA);
   static const Color amber = Color(0xFFE08E0B);
   static const Color amberBg = Color(0xFFFDF1DD);
-  static const Color nowBg = Color(0xFFE9F1FF);
-  static const Color nowBorder = Color(0xFF3355D8);
+  static const Color navyBg = Color(0xFFE9F1FF);
+  static const Color navyBorder = Color(0xFF3355D8);
 }

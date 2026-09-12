@@ -213,8 +213,8 @@ class _SessionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isNow = session.status == 'now';
-    final bg = isNow ? LecturerColors.nowBg : LecturerColors.amberBg;
-    final borderColor = isNow ? LecturerColors.nowBorder : LecturerColors.amber;
+    final bg = isNow ? LecturerColors.navyBg : LecturerColors.amberBg;
+    final borderColor = isNow ? LecturerColors.navyBorder : LecturerColors.amber;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -243,7 +243,7 @@ class _SessionCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: isNow ? LecturerColors.nowBorder : Colors.transparent,
+                color: isNow ? LecturerColors.navyBorder : Colors.transparent,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(

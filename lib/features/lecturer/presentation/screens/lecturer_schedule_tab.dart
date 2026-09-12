@@ -140,7 +140,7 @@ class _LecturerScheduleTabState extends ConsumerState<LecturerScheduleTab> {
               )
             else
               ...sessionsForDay.asMap().entries.map((entry) {
-                final colors = [LecturerColors.nowBorder, LecturerColors.amber, LecturerColors.green, LecturerColors.orange];
+                final colors = [LecturerColors.navyBorder, LecturerColors.amber, LecturerColors.green, LecturerColors.orange];
                 final color = colors[entry.key % colors.length];
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
