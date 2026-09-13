@@ -130,7 +130,7 @@ class _PortalSyncScreenState extends ConsumerState<PortalSyncScreen> {
               TextFormField(
                 controller: _usernameController,
                 decoration: InputDecoration(
-                  hintText: 'e.g. TUN/CS/001/2023',
+                  hintText: 'e.g. EBT1/09455/20',
                   prefixIcon: const Icon(Iconsax.hashtag),
                   filled: true,
                   fillColor: AppTheme.getSurface(context),

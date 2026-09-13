@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/role_select_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/reset_password_screen.dart';
@@ -18,6 +19,7 @@ import '../../features/schedule/presentation/portal_sync_screen.dart';
 import '../../features/schedule/presentation/manual_sync_screen.dart';
 import '../../features/alerts/presentation/alerts_screen.dart';
 import '../../features/schedule/presentation/student_preferences_screen.dart';
+import '../../features/lecturer/presentation/screens/lecturer_shell_screen.dart';
 
 /// A [ChangeNotifier] that listens to [AuthNotifier] and triggers
 /// GoRouter to re-evaluate redirects whenever auth state changes.
@@ -41,7 +43,7 @@ GoRouter createRouter(Ref ref) {
   final notifier = ref.read(authRouterNotifierProvider);
 
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/',
     refreshListenable: notifier,
     routes: [
       GoRoute(
@@ -53,6 +55,11 @@ GoRouter createRouter(Ref ref) {
         path: '/privacy',
         name: 'privacy',
         builder: (context, state) => const PrivacyScreen(),
+      ),
+        GoRoute(
+        path: '/',
+        name: 'role-select',
+        builder: (context, state) => const RoleSelectScreen(),
       ),
       GoRoute(
         path: '/login',
@@ -80,6 +87,16 @@ GoRouter createRouter(Ref ref) {
         path: '/home',
         name: 'home',
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: '/role-select',
+        name: 'role-select',
+        builder: (context, state) => const RoleSelectScreen(),
+      ),
+      GoRoute(
+        path: '/lecturer/home',
+        name: 'lecturer-home',
+        builder: (context, state) => const LecturerShellScreen(),
       ),
       GoRoute(
         path: '/schedule',
@@ -124,7 +141,8 @@ GoRouter createRouter(Ref ref) {
     ],
     redirect: (context, state) {
       final authState = ref.read(authProvider);
-      final isAuthEntry = state.matchedLocation == '/login' ||
+      final isAuthEntry = state.matchedLocation == '/' ||
+          state.matchedLocation == '/login' ||
           state.matchedLocation == '/register' ||
           state.matchedLocation == '/forgot-password' ||
           state.matchedLocation == '/reset-password';
@@ -139,9 +157,19 @@ GoRouter createRouter(Ref ref) {
       if (!isAuthenticated) {
         if (!isAuthEntry && !isPublicPolicyPage) return '/login';
         return null;
-      } else {
-        if (isAuthEntry) return '/home';
       }
+
+      final isLecturer = authState.user?.role == 'lecturer';
+      final roleHome = isLecturer ? '/lecturer/home' : '/home';
+
+      if (isAuthEntry) return roleHome;
+
+      // Keep each role inside its own home area — a lecturer landing on the
+      // student shell (or vice versa) gets bounced to their own home.
+      final studentOnlyRoutes = ['/home', '/schedule', '/portal-sync', '/manual-sync'];
+      if (isLecturer && studentOnlyRoutes.contains(state.matchedLocation)) return '/lecturer/home';
+      if (!isLecturer && state.matchedLocation == '/lecturer/home') return '/home';
+
       return null;
     },
   );

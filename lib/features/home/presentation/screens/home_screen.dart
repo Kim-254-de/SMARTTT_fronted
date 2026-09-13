@@ -51,7 +51,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       floatingActionButton: _selectedIndex == 2
           ? null
           : FloatingActionButton.extended(
-                  onPressed: () => context.push('/portal-sync'),
+                  onPressed: () => context.push('/student-preferences'),
                   backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   icon: const Icon(Iconsax.refresh),
@@ -264,7 +264,7 @@ class _HomeTab extends ConsumerWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Offline mode — displaying saved schedule',
+                          'Offline mode - displaying saved schedule',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,

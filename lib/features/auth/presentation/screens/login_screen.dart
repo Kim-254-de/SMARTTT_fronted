@@ -32,6 +32,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final selectedRole = ref.watch(selectedRoleProvider);
+    final isLecturer = selectedRole == 'lecturer';
+    final roleLabel = isLecturer ? 'Lecturer' : 'Student';
+    final accountHint = isLecturer ? 'Staff ID or Email' : 'Student ID or Email';
 
      ref.listen(authProvider, (previous, next) {
        if (next.error != null) {
@@ -71,7 +75,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 40),
               Center(
                 child: Text(
-                  'Welcome Back',
+                  'Welcome Back, $roleLabel',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.displayLarge,
                 ),
@@ -80,7 +84,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 8),
               Center(
                 child: Text(
-                  'Sign in to your Smart ClassCatch',
+                  'Sign in to your $roleLabel account',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
@@ -90,7 +94,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               
               AuthTextField(
                 controller: _emailController,
-                hintText: 'Student ID or Email',
+                hintText: accountHint,
                 icon: Iconsax.user,
               ).animate().fadeIn(delay: 400.ms).moveY(begin: 10),
               

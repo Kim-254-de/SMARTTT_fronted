@@ -14,9 +14,6 @@ class ScheduleScreen extends ConsumerStatefulWidget {
 }
 
 class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
-  // Flip to true to bring the "Add to Calendar" button back.
-  static const bool _showAddToCalendarButton = false;
-
   static const List<_DayItem> _days = [
     _DayItem(label: 'Mon', keyName: 'MON'),
     _DayItem(label: 'Tue', keyName: 'TUE'),
@@ -40,7 +37,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
 
   // iCalendar
 
-<<<<<<< Updated upstream
  Future<void> subscribeCalendar() async {
   final uri = Uri.parse(
     'https://api.nextup.co.ke/api/v1/schedule/calendar.ics',
@@ -51,18 +47,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     mode: LaunchMode.externalApplication,
   );
 }
-=======
-  Future<void> subscribeCalendar() async {
-    final uri = Uri.parse(
-      'https://smarttt-backend-n44z.onrender.com/api/v1/schedule/calendar.ics',
-    );
->>>>>>> Stashed changes
 
-    await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,24 +68,22 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
           children: [
-            if (_showAddToCalendarButton) ...[
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: subscribeCalendar,
-                  icon: const Icon(Icons.calendar_month),
-                  label: const Text('Add to Calendar'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: subscribeCalendar,
+                icon: const Icon(Icons.calendar_month),
+                label: const Text('Add to Calendar'),
+
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
               ),
-<<<<<<< Updated upstream
             ),
 
             const SizedBox(height: 16),
@@ -130,13 +113,10 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-=======
-              const SizedBox(height: 16),
->>>>>>> Stashed changes
             ],
             if (state.termLabel != null) ...[
               _InfoCard(
-                title: 'Current Term',
+                title: 'Current Sem',
                 value: state.termLabel!,
                 icon: Icons.school_outlined,
               ),

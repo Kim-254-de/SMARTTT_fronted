@@ -3,10 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/network/api_client.dart';
 import '../../../widgets/premium_button.dart';
 
-/// Allows students to configure or update their multi-tier timetable anchors:
-/// Course, Combination/Specialization, Year of Study, Semester, and Group/Stream (e.g., GR K, Group 3).
 class StudentPreferencesScreen extends ConsumerStatefulWidget {
   const StudentPreferencesScreen({Key? key}) : super(key: key);
 
@@ -16,55 +15,107 @@ class StudentPreferencesScreen extends ConsumerStatefulWidget {
 
 class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScreen> {
   final _formKey = GlobalKey<FormState>();
-  
-  // Controllers & Selections
-  final _courseController = TextEditingController(text: 'Bachelor of Education (Science)');
-  final _combinationController = TextEditingController(text: 'Mathematics / Chemistry');
-  final _groupController = TextEditingController(text: 'GR K');
-  
+
+  bool _isLoadingMetadata = true;
+  bool _isSaving = false;
+
+  // Dropdown options loaded from API
+  List<Map<String, dynamic>> _courses = [];
+  List<int> _years = [1, 2, 3, 4];
+  List<String> _groups = ['MAIN'];
+
+  // Selected values
+  String? _selectedCourseId;
+  String? _selectedCourseName;
   int _selectedYear = 1;
   int _selectedSemester = 1;
-  bool _isLoading = false;
+  String _selectedGroup = 'MAIN';
+  final _combinationController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchMetadata();
+  }
+
+  // Updated to accept filters so selections cascade properly
+  Future<void> _fetchMetadata({String? programId, int? yearOfStudy}) async {
+    try {
+      final dio = apiClient.dio;
+      final response = await dio.get(
+        'timetable/metadata/',
+        queryParameters: {
+          if (programId != null) 'program_id': programId,
+          if (yearOfStudy != null) 'year_of_study': yearOfStudy,
+        },
+      );
+      
+      if (mounted) {
+        setState(() {
+          _selectedSemester = response.data['semester'] ?? 1;
+          _courses = List<Map<String, dynamic>>.from(response.data['courses'] ?? []);
+          
+          if (_courses.isNotEmpty && _selectedCourseId == null) {
+            _selectedCourseId = _courses[0]['id'].toString();
+            _selectedCourseName = _courses[0]['name'];
+          }
+
+          _years = List<int>.from(response.data['years'] ?? [1, 2, 3, 4]);
+          if (_years.isNotEmpty && !_years.contains(_selectedYear)) {
+            _selectedYear = _years[0];
+          }
+          
+          _groups = List<String>.from(response.data['groups'] ?? ['MAIN']);
+          if (_groups.isNotEmpty && !_groups.contains(_selectedGroup)) {
+            _selectedGroup = _groups[0];
+          }
+          
+          _isLoadingMetadata = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingMetadata = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load timetable metadata: $e'), backgroundColor: AppTheme.error),
+        );
+      }
+    }
+  }
 
   @override
   void dispose() {
-    _courseController.dispose();
     _combinationController.dispose();
-    _groupController.dispose();
     super.dispose();
   }
 
   Future<void> _savePreferences() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() => _isSaving = true);
 
     try {
-      // TODO: Call your profile update notifier or repository method here
-      // Example:
-      // await ref.read(authNotifierProvider.notifier).updateProfile(
-      //   course: _courseController.text.trim(),
-      //   combination: _combinationController.text.trim(),
-      //   yearOfStudy: _selectedYear,
-      //   semester: _selectedSemester,
-      //   timetableGroup: _groupController.text.trim(),
-      // );
+      final dio = apiClient.dio;
+      await dio.patch('accounts/profile/', data: {
+        'course': _selectedCourseName,
+        'department': 'General',
+        'year_of_study': _selectedYear,
+        'combination': _combinationController.text.trim(),
+        'timetable_group': _selectedGroup,
+      });
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Timetable stream preferences updated successfully!')),
+        const SnackBar(content: Text('Stream preferences updated! Proceeding to portal sync...')),
       );
-      context.pop(); // Return to sync or home screen
+      context.pushReplacement('/portal-sync');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to update preferences: $e'),
-          backgroundColor: AppTheme.error,
-        ),
+        SnackBar(content: Text('Failed to save preferences: $e'), backgroundColor: AppTheme.error),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -75,174 +126,137 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Iconsax.arrow_left_2, color: AppTheme.getTextPrimary(context)),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          'Timetable Stream Setup',
-          style: TextStyle(
-            color: AppTheme.getTextPrimary(context),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        title: const Text('Timetable Stream Setup', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
+      body: _isLoadingMetadata
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: _formKey,
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Iconsax.info_circle, color: AppTheme.primary, size: 22),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Select your precise course, subject combination, and group/stream '
-                        '(e.g., GR K or Group 3) to ensure common and split units match your exact schedule.',
-                        style: TextStyle(
-                          color: AppTheme.getTextPrimary(context),
-                          fontSize: 13,
-                          height: 1.4,
-                        ),
+                    // Course Dropdown
+                    const Text('Course / Program from Timetable', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _selectedCourseId,
+                      dropdownColor: AppTheme.getSurface(context),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: AppTheme.getSurface(context),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      items: _courses.map((c) => DropdownMenuItem<String>(
+                        value: c['id'].toString(),
+                        child: Text(c['name'], overflow: TextOverflow.ellipsis),
+                      )).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedCourseId = val;
+                          _selectedCourseName = _courses.firstWhere((c) => c['id'].toString() == val)['name'];
+                        });
+                        // Trigger re-fetch scoped to the selected course and current year
+                        _fetchMetadata(programId: val, yearOfStudy: _selectedYear);
+                      },
+                      validator: (val) => val == null ? 'Please select a course' : null,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Subject Combination / Option
+                    const Text('Subject Combination / Option (Optional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _combinationController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Math / Chem',
+                        prefixIcon: const Icon(Iconsax.shapes),
+                        filled: true,
+                        fillColor: AppTheme.getSurface(context),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                       ),
                     ),
+                    const SizedBox(height: 20),
+
+                    // Year and Semester Row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Year of Study', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<int>(
+                                value: _selectedYear,
+                                dropdownColor: AppTheme.getSurface(context),
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: AppTheme.getSurface(context),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                ),
+                                items: _years.map((y) => DropdownMenuItem(value: y, child: Text('Year $y'))).toList(),
+                                onChanged: (val) {
+                                  setState(() => _selectedYear = val ?? 1);
+                                  // Trigger re-fetch scoped to current course and selected year
+                                  _fetchMetadata(programId: _selectedCourseId, yearOfStudy: _selectedYear);
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Semester', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.getSurface(context),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text('Semester $_selectedSemester (Active)', style: const TextStyle(fontWeight: FontWeight.w500)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Timetable Group / Stream Dropdown
+                    const Text('Timetable Group / Stream', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _selectedGroup,
+                      dropdownColor: AppTheme.getSurface(context),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: AppTheme.getSurface(context),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                      items: _groups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                      onChanged: (val) => setState(() => _selectedGroup = val ?? 'MAIN'),
+                    ),
+                    const SizedBox(height: 36),
+
+                    // Submit Button
+                    if (_isSaving)
+                      const Center(child: CircularProgressIndicator())
+                    else
+                      PremiumButton(
+                        text: 'Save & Continue to Sync',
+                        onPressed: _savePreferences,
+                      ),
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
-              
-              // Course Field
-              Text(
-                'Course / Program',
-                style: TextStyle(color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _courseController,
-                decoration: InputDecoration(
-                  hintText: 'e.g. Bachelor of Education (Science)',
-                  prefixIcon: const Icon(Iconsax.book),
-                  filled: true,
-                  fillColor: AppTheme.getSurface(context),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-                validator: (value) => (value == null || value.trim().isEmpty) ? 'Required' : null,
-              ),
-              const SizedBox(height: 20),
-
-              // Combination / Specialization Field
-              Text(
-                'Subject Combination / Option',
-                style: TextStyle(color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _combinationController,
-                decoration: InputDecoration(
-                  hintText: 'e.g. Mathematics / Chemistry',
-                  prefixIcon: const Icon(Iconsax.shapes),
-                  filled: true,
-                  fillColor: AppTheme.getSurface(context),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Year and Semester Row
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Year of Study',
-                          style: TextStyle(color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600, fontSize: 13),
-                        ),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<int>(
-                          value: _selectedYear,
-                          dropdownColor: AppTheme.getSurface(context),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: AppTheme.getSurface(context),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                          ),
-                          items: [1, 2, 3, 4, 5].map((y) => DropdownMenuItem(value: y, child: Text('Year $y'))).toList(),
-                          onChanged: (val) => setState(() => _selectedYear = val ?? 1),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Semester',
-                          style: TextStyle(color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600, fontSize: 13),
-                        ),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<int>(
-                          value: _selectedSemester,
-                          dropdownColor: AppTheme.getSurface(context),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: AppTheme.getSurface(context),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                          ),
-                          items: [1, 2].map((s) => DropdownMenuItem(value: s, child: Text('Semester $s'))).toList(),
-                          onChanged: (val) => setState(() => _selectedSemester = val ?? 1),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Group / Stream Field
-              Text(
-                'Timetable Group / Stream Tag',
-                style: TextStyle(color: AppTheme.getTextSecondary(context), fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _groupController,
-                decoration: InputDecoration(
-                  hintText: 'e.g. GR K, Group 3, GR F',
-                  prefixIcon: const Icon(Iconsax.status),
-                  filled: true,
-                  fillColor: AppTheme.getSurface(context),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                ),
-              ),
-              const SizedBox(height: 36),
-
-              // Submit Button
-              if (_isLoading)
-                const Center(child: CircularProgressIndicator())
-              else
-                PremiumButton(
-                  text: 'Save & Continue to Sync',
-                  onPressed: _savePreferences,
-                ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }

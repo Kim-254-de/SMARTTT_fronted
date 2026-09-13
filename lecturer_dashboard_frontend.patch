@@ -1,0 +1,1377 @@
+diff --git a/lib/core/router/app_router.dart b/lib/core/router/app_router.dart
+index 9605722..1851f80 100644
+--- a/lib/core/router/app_router.dart
++++ b/lib/core/router/app_router.dart
+@@ -17,6 +17,7 @@ import '../../features/schedule/presentation/schedule_screen.dart';
+ import '../../features/schedule/presentation/portal_sync_screen.dart';
+ import '../../features/schedule/presentation/manual_sync_screen.dart';
+ import '../../features/alerts/presentation/alerts_screen.dart';
++import '../../features/lecturer/presentation/screens/lecturer_shell_screen.dart';
+ 
+ /// A [ChangeNotifier] that listens to [AuthNotifier] and triggers
+ /// GoRouter to re-evaluate redirects whenever auth state changes.
+@@ -80,6 +81,11 @@ GoRouter createRouter(Ref ref) {
+         name: 'home',
+         builder: (context, state) => const HomeScreen(),
+       ),
++      GoRoute(
++        path: '/lecturer/home',
++        name: 'lecturer-home',
++        builder: (context, state) => const LecturerShellScreen(),
++      ),
+       GoRoute(
+         path: '/schedule',
+         name: 'schedule',
+@@ -133,9 +139,19 @@ GoRouter createRouter(Ref ref) {
+       if (!isAuthenticated) {
+         if (!isAuthEntry && !isPublicPolicyPage) return '/login';
+         return null;
+-      } else {
+-        if (isAuthEntry) return '/home';
+       }
++
++      final isLecturer = authState.user?.role == 'lecturer';
++      final roleHome = isLecturer ? '/lecturer/home' : '/home';
++
++      if (isAuthEntry) return roleHome;
++
++      // Keep each role inside its own home area — a lecturer landing on the
++      // student shell (or vice versa) gets bounced to their own home.
++      final studentOnlyRoutes = ['/home', '/schedule', '/portal-sync', '/manual-sync'];
++      if (isLecturer && studentOnlyRoutes.contains(state.matchedLocation)) return '/lecturer/home';
++      if (!isLecturer && state.matchedLocation == '/lecturer/home') return '/home';
++
+       return null;
+     },
+   );
+diff --git a/lib/features/lecturer/data/lecturer_repository.dart b/lib/features/lecturer/data/lecturer_repository.dart
+new file mode 100644
+index 0000000..ab6214c
+--- /dev/null
++++ b/lib/features/lecturer/data/lecturer_repository.dart
+@@ -0,0 +1,121 @@
++import 'package:dio/dio.dart';
++import '../../../core/network/api_client.dart';
++import '../domain/models/lecturer_dashboard_model.dart';
++
++/// Thrown when a venue-change notification fails the room-capacity check.
++/// [suggestedRooms] is populated by the backend so the UI can offer
++/// alternatives instead of a dead-end error message.
++class VenueCapacityException implements Exception {
++  final String message;
++  final List<Map<String, dynamic>> suggestedRooms;
++  VenueCapacityException(this.message, this.suggestedRooms);
++}
++
++class LecturerRepository {
++  /// GET /auth/lecturer/profile/ — single call that feeds Home, Schedule
++  /// and Profile. See apps/accounts/views/auth_views.py::LecturerProfileView.
++  Future<LecturerDashboardModel> fetchDashboard() async {
++    try {
++      final response = await apiClient.dio.get('auth/lecturer/profile/');
++      return LecturerDashboardModel.fromJson(response.data as Map<String, dynamic>);
++    } catch (e) {
++      throw _handleError(e);
++    }
++  }
++
++  /// POST /notifications/lecturer/validate-venue/
++  /// Call this before send() when notificationType == 'venue_change' so the
++  /// lecturer gets instant capacity feedback (with alternatives) rather than
++  /// discovering it only after tapping Send.
++  Future<void> validateVenue({
++    required String newVenueId,
++    required int expectedStudents,
++  }) async {
++    try {
++      await apiClient.dio.post('notifications/lecturer/validate-venue/', data: {
++        'new_venue_id': newVenueId,
++        'expected_students': expectedStudents,
++      });
++    } on DioException catch (e) {
++      final data = e.response?.data;
++      if (data is Map && data.containsKey('capacity_error')) {
++        final suggestions = (data['suggested_rooms'] as List? ?? [])
++            .map((r) => Map<String, dynamic>.from(r as Map))
++            .toList();
++        throw VenueCapacityException(data['capacity_error'].toString(), suggestions);
++      }
++      throw _handleError(e);
++    } catch (e) {
++      throw _handleError(e);
++    }
++  }
++
++  /// POST /notifications/lecturer/send/
++  /// For notificationType == 'venue_change', pass newVenueId + expectedStudents
++  /// too — the backend re-validates capacity and only sends if it fits.
++  Future<Map<String, dynamic>> sendNotification({
++    required String unitId,
++    required String notificationType,
++    required String title,
++    required String message,
++    String? newVenueId,
++    int? expectedStudents,
++  }) async {
++    try {
++      final response = await apiClient.dio.post('notifications/lecturer/send/', data: {
++        'unit_id': unitId,
++        'notification_type': notificationType,
++        'title': title,
++        'message': message,
++        if (newVenueId != null) 'new_venue_id': newVenueId,
++        if (expectedStudents != null) 'expected_students': expectedStudents,
++      });
++      return Map<String, dynamic>.from(response.data as Map);
++    } on DioException catch (e) {
++      final data = e.response?.data;
++      if (data is Map && data.containsKey('capacity_error')) {
++        final suggestions = (data['suggested_rooms'] as List? ?? [])
++            .map((r) => Map<String, dynamic>.from(r as Map))
++            .toList();
++        throw VenueCapacityException(data['capacity_error'].toString(), suggestions);
++      }
++      throw _handleError(e);
++    } catch (e) {
++      throw _handleError(e);
++    }
++  }
++
++  /// GET /rooms/rooms/?search=... — used by the venue picker when
++  /// notificationType == 'venue_change'.
++  Future<List<RoomModel>> fetchRooms({String? search}) async {
++    try {
++      final response = await apiClient.dio.get('rooms/rooms/', queryParameters: {
++        if (search != null && search.isNotEmpty) 'search': search,
++      });
++      final dynamic data = response.data;
++      final List<dynamic> results = data is Map && data['results'] is List
++          ? data['results'] as List
++          : (data is List ? data : []);
++      return results.map((json) => RoomModel.fromJson(json as Map<String, dynamic>)).toList();
++    } catch (e) {
++      throw _handleError(e);
++    }
++  }
++
++  Exception _handleError(Object e) {
++    if (e is DioException) {
++      final data = e.response?.data;
++      if (data is Map && data.isNotEmpty) {
++        if (data.containsKey('detail')) return Exception(data['detail'].toString());
++        final first = data.values.first;
++        if (first is List && first.isNotEmpty) return Exception(first.first.toString());
++      }
++      final statusCode = e.response?.statusCode;
++      if (statusCode != null && statusCode >= 500) {
++        return Exception('The server is temporarily unavailable. Please try again later.');
++      }
++      return Exception('Something went wrong. Please try again.');
++    }
++    return Exception('Something went wrong. Please try again.');
++  }
++}
+diff --git a/lib/features/lecturer/domain/models/lecturer_dashboard_model.dart b/lib/features/lecturer/domain/models/lecturer_dashboard_model.dart
+new file mode 100644
+index 0000000..ae818f5
+--- /dev/null
++++ b/lib/features/lecturer/domain/models/lecturer_dashboard_model.dart
+@@ -0,0 +1,183 @@
++/// A single teaching session, as returned inside `timetable` (grouped by
++/// day) or `today_sessions` (flat, today only, with a `status`) from
++/// GET /api/v1/auth/lecturer/profile/.
++class LecturerSessionModel {
++  final String id;
++  final String unitId;
++  final String unitCode;
++  final String unitName;
++  final String day;
++  final String startTime; // "HH:mm"
++  final String endTime; // "HH:mm"
++  final String room;
++  final String program;
++  final int studentCount;
++  final String? status; // "now" | "upcoming" | "completed" — only set for today's sessions
++
++  LecturerSessionModel({
++    required this.id,
++    required this.unitId,
++    required this.unitCode,
++    required this.unitName,
++    required this.day,
++    required this.startTime,
++    required this.endTime,
++    required this.room,
++    required this.program,
++    required this.studentCount,
++    this.status,
++  });
++
++  String get timeRange => '$startTime - $endTime';
++
++  factory LecturerSessionModel.fromJson(Map<String, dynamic> json) {
++    return LecturerSessionModel(
++      id: json['id']?.toString() ?? '',
++      unitId: json['unit_id']?.toString() ?? '',
++      unitCode: json['unit_code']?.toString() ?? '',
++      unitName: json['unit_name']?.toString() ?? '',
++      day: json['day']?.toString() ?? '',
++      startTime: json['start_time']?.toString() ?? '',
++      endTime: json['end_time']?.toString() ?? '',
++      room: json['room']?.toString() ?? 'TBA',
++      program: json['program']?.toString() ?? '',
++      studentCount: (json['student_count'] as num?)?.toInt() ?? 0,
++      status: json['status']?.toString(),
++    );
++  }
++}
++
++/// A unit the lecturer teaches — used to populate the Send Notification
++/// screen's unit dropdown (needs the actual id, not just the display code).
++class LecturerUnitModel {
++  final String id;
++  final String code;
++  final String name;
++
++  LecturerUnitModel({required this.id, required this.code, required this.name});
++
++  factory LecturerUnitModel.fromJson(Map<String, dynamic> json) {
++    return LecturerUnitModel(
++      id: json['id']?.toString() ?? '',
++      code: json['code']?.toString() ?? '',
++      name: json['name']?.toString() ?? '',
++    );
++  }
++
++  @override
++  String toString() => code;
++}
++
++class LecturerSummaryModel {
++  final int unitsCount;
++  final int weeklySessions;
++  final int totalStudents;
++  final int completedToday;
++  final int remainingToday;
++
++  LecturerSummaryModel({
++    required this.unitsCount,
++    required this.weeklySessions,
++    required this.totalStudents,
++    required this.completedToday,
++    required this.remainingToday,
++  });
++
++  factory LecturerSummaryModel.fromJson(Map<String, dynamic> json) {
++    return LecturerSummaryModel(
++      unitsCount: (json['units_count'] as num?)?.toInt() ?? 0,
++      weeklySessions: (json['weekly_sessions'] as num?)?.toInt() ?? 0,
++      totalStudents: (json['total_students'] as num?)?.toInt() ?? 0,
++      completedToday: (json['completed_today'] as num?)?.toInt() ?? 0,
++      remainingToday: (json['remaining_today'] as num?)?.toInt() ?? 0,
++    );
++  }
++}
++
++class LecturerInfoModel {
++  final String staffId;
++  final String department;
++  final String rank;
++
++  LecturerInfoModel({required this.staffId, required this.department, required this.rank});
++
++  factory LecturerInfoModel.fromJson(Map<String, dynamic> json) {
++    return LecturerInfoModel(
++      staffId: json['staff_id']?.toString() ?? '',
++      department: json['department']?.toString() ?? '',
++      rank: json['rank']?.toString() ?? '',
++    );
++  }
++}
++
++/// A room option for the venue-change picker on Send Notification.
++class RoomModel {
++  final String id;
++  final String code;
++  final String name;
++  final int capacity;
++
++  RoomModel({required this.id, required this.code, required this.name, required this.capacity});
++
++  factory RoomModel.fromJson(Map<String, dynamic> json) {
++    return RoomModel(
++      id: json['id']?.toString() ?? '',
++      code: json['code']?.toString() ?? '',
++      name: json['name']?.toString() ?? '',
++      capacity: (json['capacity'] as num?)?.toInt() ?? 0,
++    );
++  }
++
++  String get label => '$code (capacity $capacity)';
++
++  @override
++  String toString() => label;
++}
++
++/// Full dashboard payload — one call feeds Home, Schedule and Profile.
++class LecturerDashboardModel {
++  final LecturerInfoModel? lecturer;
++  final String? currentTerm;
++  final String today; // "MON".."SAT"
++  final List<String> allocatedUnits; // display codes, e.g. for the Schedule screen chips
++  final List<LecturerUnitModel> units; // id+code+name, for the notification form
++  final LecturerSummaryModel summary;
++  final Map<String, List<LecturerSessionModel>> timetable; // day code -> sessions
++  final List<LecturerSessionModel> todaySessions;
++
++  LecturerDashboardModel({
++    required this.lecturer,
++    required this.currentTerm,
++    required this.today,
++    required this.allocatedUnits,
++    required this.units,
++    required this.summary,
++    required this.timetable,
++    required this.todaySessions,
++  });
++
++  factory LecturerDashboardModel.fromJson(Map<String, dynamic> json) {
++    final timetableJson = (json['timetable'] as Map?)?.cast<String, dynamic>() ?? {};
++    return LecturerDashboardModel(
++      lecturer: json['lecturer'] != null
++          ? LecturerInfoModel.fromJson(json['lecturer'] as Map<String, dynamic>)
++          : null,
++      currentTerm: json['current_term']?.toString(),
++      today: json['today']?.toString() ?? 'MON',
++      allocatedUnits: (json['allocated_units'] as List? ?? []).map((e) => e.toString()).toList(),
++      units: (json['units'] as List? ?? [])
++          .map((e) => LecturerUnitModel.fromJson(e as Map<String, dynamic>))
++          .toList(),
++      summary: LecturerSummaryModel.fromJson((json['summary'] as Map?)?.cast<String, dynamic>() ?? {}),
++      timetable: timetableJson.map((day, sessions) => MapEntry(
++            day,
++            (sessions as List)
++                .map((s) => LecturerSessionModel.fromJson(s as Map<String, dynamic>))
++                .toList(),
++          )),
++      todaySessions: (json['today_sessions'] as List? ?? [])
++          .map((e) => LecturerSessionModel.fromJson(e as Map<String, dynamic>))
++          .toList(),
++    );
++  }
++}
+diff --git a/lib/features/lecturer/presentation/providers/lecturer_dashboard_provider.dart b/lib/features/lecturer/presentation/providers/lecturer_dashboard_provider.dart
+new file mode 100644
+index 0000000..9aada97
+--- /dev/null
++++ b/lib/features/lecturer/presentation/providers/lecturer_dashboard_provider.dart
+@@ -0,0 +1,49 @@
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../../data/lecturer_repository.dart';
++import '../../domain/models/lecturer_dashboard_model.dart';
++
++class LecturerDashboardState {
++  final bool isLoading;
++  final String? error;
++  final LecturerDashboardModel? dashboard;
++
++  LecturerDashboardState({this.isLoading = false, this.error, this.dashboard});
++
++  LecturerDashboardState copyWith({
++    bool? isLoading,
++    String? error,
++    LecturerDashboardModel? dashboard,
++    bool clearError = false,
++  }) {
++    return LecturerDashboardState(
++      isLoading: isLoading ?? this.isLoading,
++      error: clearError ? null : (error ?? this.error),
++      dashboard: dashboard ?? this.dashboard,
++    );
++  }
++}
++
++final lecturerRepositoryProvider = Provider((ref) => LecturerRepository());
++
++class LecturerDashboardNotifier extends Notifier<LecturerDashboardState> {
++  late final LecturerRepository _repository;
++
++  @override
++  LecturerDashboardState build() {
++    _repository = ref.watch(lecturerRepositoryProvider);
++    return LecturerDashboardState();
++  }
++
++  Future<void> fetchDashboard() async {
++    state = state.copyWith(isLoading: true, clearError: true);
++    try {
++      final dashboard = await _repository.fetchDashboard();
++      state = LecturerDashboardState(isLoading: false, dashboard: dashboard);
++    } catch (e) {
++      state = state.copyWith(isLoading: false, error: e.toString().replaceFirst('Exception: ', ''));
++    }
++  }
++}
++
++final lecturerDashboardProvider =
++    NotifierProvider<LecturerDashboardNotifier, LecturerDashboardState>(LecturerDashboardNotifier.new);
+diff --git a/lib/features/lecturer/presentation/screens/lecturer_home_tab.dart b/lib/features/lecturer/presentation/screens/lecturer_home_tab.dart
+new file mode 100644
+index 0000000..8f894ab
+--- /dev/null
++++ b/lib/features/lecturer/presentation/screens/lecturer_home_tab.dart
+@@ -0,0 +1,262 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../../../auth/presentation/providers/auth_provider.dart';
++import '../providers/lecturer_dashboard_provider.dart';
++import '../../domain/models/lecturer_dashboard_model.dart';
++import '../widgets/lecturer_colors.dart';
++
++class LecturerHomeTab extends ConsumerWidget {
++  const LecturerHomeTab({super.key});
++
++  String _formatDate(DateTime now) {
++    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
++    const months = [
++      'January', 'February', 'March', 'April', 'May', 'June',
++      'July', 'August', 'September', 'October', 'November', 'December'
++    ];
++    return '${days[now.weekday - 1]}, ${now.day} ${months[now.month - 1]} ${now.year}';
++  }
++
++  @override
++  Widget build(BuildContext context, WidgetRef ref) {
++    final authState = ref.watch(authProvider);
++    final dashboardState = ref.watch(lecturerDashboardProvider);
++    final user = authState.user;
++    final dashboard = dashboardState.dashboard;
++
++    final now = DateTime.now();
++    String greeting = 'Good Morning';
++    if (now.hour >= 12 && now.hour < 16) {
++      greeting = 'Good Afternoon';
++    } else if (now.hour >= 16) {
++      greeting = 'Good Evening';
++    }
++
++    final firstName = (user?.fullName ?? 'Lecturer').split(' ').first;
++
++    return RefreshIndicator(
++      onRefresh: () => ref.read(lecturerDashboardProvider.notifier).fetchDashboard(),
++      child: SingleChildScrollView(
++        physics: const AlwaysScrollableScrollPhysics(),
++        child: Column(
++          crossAxisAlignment: CrossAxisAlignment.stretch,
++          children: [
++            // ── Header ────────────────────────────────────────────────────
++            Container(
++              width: double.infinity,
++              padding: const EdgeInsets.fromLTRB(20, 60, 20, 28),
++              decoration: const BoxDecoration(
++                color: LecturerColors.navy,
++                borderRadius: BorderRadius.only(
++                  bottomLeft: Radius.circular(24),
++                  bottomRight: Radius.circular(24),
++                ),
++              ),
++              child: Column(
++                crossAxisAlignment: CrossAxisAlignment.start,
++                children: [
++                  Text('👋 $greeting,', style: const TextStyle(color: Colors.white70, fontSize: 15)),
++                  const SizedBox(height: 2),
++                  Text(
++                    firstName,
++                    style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold),
++                  ),
++                  const SizedBox(height: 6),
++                  Text(_formatDate(now), style: const TextStyle(color: Colors.white60, fontSize: 13)),
++                ],
++              ),
++            ),
++
++            if (dashboardState.isLoading && dashboard == null)
++              const Padding(
++                padding: EdgeInsets.only(top: 60),
++                child: Center(child: CircularProgressIndicator(color: LecturerColors.navy)),
++              )
++            else if (dashboardState.error != null && dashboard == null)
++              Padding(
++                padding: const EdgeInsets.all(32),
++                child: Column(
++                  children: [
++                    Text(dashboardState.error!, textAlign: TextAlign.center),
++                    const SizedBox(height: 12),
++                    TextButton(
++                      onPressed: () => ref.read(lecturerDashboardProvider.notifier).fetchDashboard(),
++                      child: const Text('Retry'),
++                    ),
++                  ],
++                ),
++              )
++            else if (dashboard != null)
++              Padding(
++                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
++                child: Column(
++                  crossAxisAlignment: CrossAxisAlignment.start,
++                  children: [
++                    // ── Row 1: units / weekly sessions / total students ───
++                    Row(
++                      children: [
++                        Expanded(child: _StatCard(value: '${dashboard.summary.unitsCount}', label: 'Units This Term', color: LecturerColors.navy)),
++                        const SizedBox(width: 10),
++                        Expanded(child: _StatCard(value: '${dashboard.summary.weeklySessions}', label: 'Weekly Sessions', color: LecturerColors.orange)),
++                        const SizedBox(width: 10),
++                        Expanded(child: _StatCard(value: '${dashboard.summary.totalStudents}', label: 'Total Students', color: LecturerColors.green)),
++                      ],
++                    ),
++                    const SizedBox(height: 12),
++                    // ── Row 2: completed / remaining today ────────────────
++                    Row(
++                      children: [
++                        Expanded(
++                          child: _BigStatCard(
++                            value: '${dashboard.summary.completedToday}',
++                            label: 'Completed Today',
++                            bg: LecturerColors.greenBg,
++                            fg: LecturerColors.green,
++                          ),
++                        ),
++                        const SizedBox(width: 10),
++                        Expanded(
++                          child: _BigStatCard(
++                            value: '${dashboard.summary.remainingToday}',
++                            label: 'Remaining Today',
++                            bg: LecturerColors.amberBg,
++                            fg: LecturerColors.amber,
++                          ),
++                        ),
++                      ],
++                    ),
++                    const SizedBox(height: 24),
++
++                    Row(
++                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
++                      children: [
++                        const Text("Today's Sessions", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
++                        Text(dashboard.today[0] + dashboard.today.substring(1).toLowerCase(),
++                            style: const TextStyle(color: Colors.grey)),
++                      ],
++                    ),
++                    const SizedBox(height: 12),
++
++                    if (dashboard.todaySessions.isEmpty)
++                      const Padding(
++                        padding: EdgeInsets.symmetric(vertical: 24),
++                        child: Center(child: Text('No sessions scheduled for today.', style: TextStyle(color: Colors.grey))),
++                      )
++                    else
++                      ...dashboard.todaySessions.map((s) => Padding(
++                            padding: const EdgeInsets.only(bottom: 12),
++                            child: _SessionCard(session: s),
++                          )),
++                  ],
++                ),
++              ),
++          ],
++        ),
++      ),
++    );
++  }
++}
++
++class _StatCard extends StatelessWidget {
++  final String value;
++  final String label;
++  final Color color;
++  const _StatCard({required this.value, required this.label, required this.color});
++
++  @override
++  Widget build(BuildContext context) {
++    return Container(
++      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
++      decoration: BoxDecoration(
++        color: Theme.of(context).cardColor,
++        borderRadius: BorderRadius.circular(14),
++        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2))],
++      ),
++      child: Column(
++        children: [
++          Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
++          const SizedBox(height: 4),
++          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Colors.grey)),
++        ],
++      ),
++    );
++  }
++}
++
++class _BigStatCard extends StatelessWidget {
++  final String value;
++  final String label;
++  final Color bg;
++  final Color fg;
++  const _BigStatCard({required this.value, required this.label, required this.bg, required this.fg});
++
++  @override
++  Widget build(BuildContext context) {
++    return Container(
++      padding: const EdgeInsets.symmetric(vertical: 18),
++      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(16)),
++      child: Column(
++        children: [
++          Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: fg)),
++          const SizedBox(height: 4),
++          Text(label, style: TextStyle(fontSize: 12, color: fg.withValues(alpha: 0.85), fontWeight: FontWeight.w600)),
++        ],
++      ),
++    );
++  }
++}
++
++class _SessionCard extends StatelessWidget {
++  final LecturerSessionModel session;
++  const _SessionCard({required this.session});
++
++  @override
++  Widget build(BuildContext context) {
++    final isNow = session.status == 'now';
++    final bg = isNow ? LecturerColors.nowBg : LecturerColors.amberBg;
++    final borderColor = isNow ? LecturerColors.nowBorder : LecturerColors.amber;
++
++    return Container(
++      padding: const EdgeInsets.all(14),
++      decoration: BoxDecoration(
++        color: bg,
++        borderRadius: BorderRadius.circular(12),
++        border: Border(left: BorderSide(color: borderColor, width: 4)),
++      ),
++      child: Row(
++        crossAxisAlignment: CrossAxisAlignment.start,
++        children: [
++          Expanded(
++            child: Column(
++              crossAxisAlignment: CrossAxisAlignment.start,
++              children: [
++                Text(session.timeRange, style: TextStyle(color: borderColor, fontWeight: FontWeight.w600, fontSize: 13)),
++                const SizedBox(height: 4),
++                Text(session.unitCode, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
++                const SizedBox(height: 2),
++                Text('${session.room} · ${session.program} · ${session.studentCount} students',
++                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
++              ],
++            ),
++          ),
++          if (session.status != null)
++            Container(
++              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
++              decoration: BoxDecoration(
++                color: isNow ? LecturerColors.nowBorder : Colors.transparent,
++                borderRadius: BorderRadius.circular(20),
++              ),
++              child: Text(
++                session.status == 'now' ? 'Now' : (session.status == 'completed' ? 'Done' : 'Upcoming'),
++                style: TextStyle(
++                  fontSize: 11,
++                  fontWeight: FontWeight.w600,
++                  color: isNow ? Colors.white : LecturerColors.amber,
++                ),
++              ),
++            ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/features/lecturer/presentation/screens/lecturer_profile_tab.dart b/lib/features/lecturer/presentation/screens/lecturer_profile_tab.dart
+new file mode 100644
+index 0000000..b9df9af
+--- /dev/null
++++ b/lib/features/lecturer/presentation/screens/lecturer_profile_tab.dart
+@@ -0,0 +1,413 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'package:go_router/go_router.dart';
++import 'package:iconsax/iconsax.dart';
++import '../../../auth/presentation/providers/auth_provider.dart';
++import '../providers/lecturer_dashboard_provider.dart';
++import '../../data/lecturer_repository.dart';
++import '../../domain/models/lecturer_dashboard_model.dart';
++import '../widgets/lecturer_colors.dart';
++
++class _NotificationTypeOption {
++  final String value;
++  final String label;
++  final IconData icon;
++  const _NotificationTypeOption(this.value, this.label, this.icon);
++}
++
++const _typeOptions = [
++  _NotificationTypeOption('general', 'General', Iconsax.info_circle),
++  _NotificationTypeOption('timetable_change', 'Timetable Change', Iconsax.calendar_edit),
++  _NotificationTypeOption('sync_reminder', 'Sync Reminder', Iconsax.refresh),
++  _NotificationTypeOption('venue_change', 'Venue Change', Iconsax.location),
++];
++
++class LecturerProfileTab extends ConsumerStatefulWidget {
++  const LecturerProfileTab({super.key});
++
++  @override
++  ConsumerState<LecturerProfileTab> createState() => _LecturerProfileTabState();
++}
++
++class _LecturerProfileTabState extends ConsumerState<LecturerProfileTab> {
++  final _titleController = TextEditingController();
++  final _messageController = TextEditingController();
++  final _expectedStudentsController = TextEditingController();
++
++  LecturerUnitModel? _selectedUnit;
++  String _selectedType = 'general';
++  RoomModel? _selectedVenue;
++  List<RoomModel> _rooms = [];
++  bool _roomsLoading = false;
++  bool _sending = false;
++
++  @override
++  void dispose() {
++    _titleController.dispose();
++    _messageController.dispose();
++    _expectedStudentsController.dispose();
++    super.dispose();
++  }
++
++  Future<void> _loadRoomsIfNeeded() async {
++    if (_rooms.isNotEmpty || _roomsLoading) return;
++    setState(() => _roomsLoading = true);
++    try {
++      final rooms = await ref.read(lecturerRepositoryProvider).fetchRooms();
++      if (mounted) setState(() => _rooms = rooms);
++    } catch (_) {
++      // Silently ignore — the dropdown will just stay empty and the field is
++      // required, so the person will notice and can retry by reselecting the type.
++    } finally {
++      if (mounted) setState(() => _roomsLoading = false);
++    }
++  }
++
++  Future<void> _handleSend() async {
++    if (_selectedUnit == null) {
++      _showSnack('Please select a unit.', isError: true);
++      return;
++    }
++    if (_titleController.text.trim().isEmpty || _messageController.text.trim().isEmpty) {
++      _showSnack('Please enter a title and message.', isError: true);
++      return;
++    }
++    String? newVenueId;
++    int? expectedStudents;
++    if (_selectedType == 'venue_change') {
++      if (_selectedVenue == null || _expectedStudentsController.text.trim().isEmpty) {
++        _showSnack('Please select the new venue and expected number of students.', isError: true);
++        return;
++      }
++      newVenueId = _selectedVenue!.id;
++      expectedStudents = int.tryParse(_expectedStudentsController.text.trim());
++      if (expectedStudents == null) {
++        _showSnack('Expected students must be a number.', isError: true);
++        return;
++      }
++    }
++
++    setState(() => _sending = true);
++    try {
++      final result = await ref.read(lecturerRepositoryProvider).sendNotification(
++            unitId: _selectedUnit!.id,
++            notificationType: _selectedType,
++            title: _titleController.text.trim(),
++            message: _messageController.text.trim(),
++            newVenueId: newVenueId,
++            expectedStudents: expectedStudents,
++          );
++      if (!mounted) return;
++      final recipients = result['recipients'] ?? 0;
++      _showSnack('Sent to $recipients student${recipients == 1 ? '' : 's'}.');
++      _titleController.clear();
++      _messageController.clear();
++      _expectedStudentsController.clear();
++      setState(() {
++        _selectedVenue = null;
++      });
++    } on VenueCapacityException catch (e) {
++      if (!mounted) return;
++      _showCapacityDialog(e);
++    } catch (e) {
++      if (!mounted) return;
++      _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
++    } finally {
++      if (mounted) setState(() => _sending = false);
++    }
++  }
++
++  void _showSnack(String message, {bool isError = false}) {
++    ScaffoldMessenger.of(context).showSnackBar(
++      SnackBar(content: Text(message), backgroundColor: isError ? Colors.red : LecturerColors.green),
++    );
++  }
++
++  void _showCapacityDialog(VenueCapacityException e) {
++    showDialog(
++      context: context,
++      builder: (context) => AlertDialog(
++        title: const Text("That room won't fit"),
++        content: Column(
++          mainAxisSize: MainAxisSize.min,
++          crossAxisAlignment: CrossAxisAlignment.start,
++          children: [
++            Text(e.message),
++            if (e.suggestedRooms.isNotEmpty) ...[
++              const SizedBox(height: 12),
++              const Text('Try one of these instead:', style: TextStyle(fontWeight: FontWeight.w600)),
++              const SizedBox(height: 6),
++              ...e.suggestedRooms.map((r) => Text('• ${r['code']} (capacity ${r['capacity']})')),
++            ],
++          ],
++        ),
++        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
++      ),
++    );
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    final authState = ref.watch(authProvider);
++    final dashboardState = ref.watch(lecturerDashboardProvider);
++    final user = authState.user;
++    final dashboard = dashboardState.dashboard;
++
++    final initials = (user?.fullName ?? '?')
++        .trim()
++        .split(' ')
++        .where((p) => p.isNotEmpty)
++        .take(2)
++        .map((p) => p[0].toUpperCase())
++        .join();
++
++    return SingleChildScrollView(
++      padding: const EdgeInsets.fromLTRB(16, 60, 16, 24),
++      child: Column(
++        crossAxisAlignment: CrossAxisAlignment.start,
++        children: [
++          // ── Profile info card ───────────────────────────────────────────
++          Container(
++            width: double.infinity,
++            padding: const EdgeInsets.all(18),
++            decoration: BoxDecoration(
++              color: Theme.of(context).cardColor,
++              borderRadius: BorderRadius.circular(16),
++              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 2))],
++            ),
++            child: Row(
++              children: [
++                CircleAvatar(
++                  radius: 26,
++                  backgroundColor: LecturerColors.navy,
++                  child: Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
++                ),
++                const SizedBox(width: 14),
++                Expanded(
++                  child: Column(
++                    crossAxisAlignment: CrossAxisAlignment.start,
++                    children: [
++                      Text(user?.fullName ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
++                      if (dashboard?.lecturer?.staffId.isNotEmpty == true)
++                        Text('STAFF-${dashboard!.lecturer!.staffId}',
++                            style: const TextStyle(color: LecturerColors.orange, fontSize: 12, fontWeight: FontWeight.w600)),
++                      if (dashboard?.lecturer?.department.isNotEmpty == true)
++                        Text(dashboard!.lecturer!.department, style: const TextStyle(color: Colors.grey, fontSize: 12)),
++                    ],
++                  ),
++                ),
++                IconButton(
++                  onPressed: () => context.pushNamed('edit-profile'),
++                  icon: const Icon(Iconsax.edit),
++                ),
++              ],
++            ),
++          ),
++          const SizedBox(height: 12),
++          Container(
++            width: double.infinity,
++            padding: const EdgeInsets.all(16),
++            decoration: BoxDecoration(
++              color: Theme.of(context).cardColor,
++              borderRadius: BorderRadius.circular(16),
++            ),
++            child: Column(
++              children: [
++                _InfoRow(label: 'Email', value: user?.email ?? ''),
++                const SizedBox(height: 10),
++                _InfoRow(label: 'Department', value: dashboard?.lecturer?.department ?? ''),
++                const SizedBox(height: 10),
++                _InfoRow(label: 'Staff ID', value: dashboard?.lecturer?.staffId ?? user?.universityId ?? ''),
++              ],
++            ),
++          ),
++          const SizedBox(height: 24),
++
++          // ── Send Notification form ──────────────────────────────────────
++          Row(
++            children: const [
++              Icon(Iconsax.notification, size: 18, color: LecturerColors.navy),
++              SizedBox(width: 8),
++              Text('Send Notification to Students', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
++            ],
++          ),
++          const SizedBox(height: 16),
++
++          const Text('UNIT', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600)),
++          const SizedBox(height: 6),
++          _FieldContainer(
++            child: DropdownButtonHideUnderline(
++              child: DropdownButtonFormField<LecturerUnitModel>(
++                value: _selectedUnit,
++                isExpanded: true,
++                decoration: const InputDecoration(border: InputBorder.none),
++                hint: const Text('— Select unit —'),
++                items: (dashboard?.units ?? [])
++                    .map((u) => DropdownMenuItem(value: u, child: Text('${u.code} — ${u.name}', overflow: TextOverflow.ellipsis)))
++                    .toList(),
++                onChanged: (u) => setState(() => _selectedUnit = u),
++              ),
++            ),
++          ),
++          const SizedBox(height: 16),
++
++          const Text('TYPE', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600)),
++          const SizedBox(height: 6),
++          GridView.count(
++            crossAxisCount: 2,
++            shrinkWrap: true,
++            physics: const NeverScrollableScrollPhysics(),
++            mainAxisSpacing: 10,
++            crossAxisSpacing: 10,
++            childAspectRatio: 2.6,
++            children: _typeOptions.map((opt) {
++              final selected = _selectedType == opt.value;
++              return GestureDetector(
++                onTap: () {
++                  setState(() => _selectedType = opt.value);
++                  if (opt.value == 'venue_change') _loadRoomsIfNeeded();
++                },
++                child: Container(
++                  alignment: Alignment.center,
++                  decoration: BoxDecoration(
++                    color: selected ? LecturerColors.navy : Theme.of(context).cardColor,
++                    borderRadius: BorderRadius.circular(12),
++                    border: Border.all(color: selected ? LecturerColors.navy : Colors.grey.shade300),
++                  ),
++                  child: Row(
++                    mainAxisAlignment: MainAxisAlignment.center,
++                    children: [
++                      Icon(opt.icon, size: 15, color: selected ? Colors.white : Colors.grey.shade600),
++                      const SizedBox(width: 6),
++                      Flexible(
++                        child: Text(
++                          opt.label,
++                          overflow: TextOverflow.ellipsis,
++                          style: TextStyle(
++                            fontSize: 12,
++                            fontWeight: FontWeight.w600,
++                            color: selected ? Colors.white : Colors.grey.shade700,
++                          ),
++                        ),
++                      ),
++                    ],
++                  ),
++                ),
++              );
++            }).toList(),
++          ),
++          const SizedBox(height: 16),
++
++          if (_selectedType == 'venue_change') ...[
++            const Text('NEW VENUE', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600)),
++            const SizedBox(height: 6),
++            _FieldContainer(
++              child: _roomsLoading
++                  ? const Padding(
++                      padding: EdgeInsets.symmetric(vertical: 14),
++                      child: Row(children: [
++                        SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
++                        SizedBox(width: 12),
++                        Text('Loading rooms…'),
++                      ]),
++                    )
++                  : DropdownButtonHideUnderline(
++                      child: DropdownButtonFormField<RoomModel>(
++                        value: _selectedVenue,
++                        isExpanded: true,
++                        decoration: const InputDecoration(border: InputBorder.none),
++                        hint: const Text('— Select new room —'),
++                        items: _rooms.map((r) => DropdownMenuItem(value: r, child: Text(r.label))).toList(),
++                        onChanged: (r) => setState(() => _selectedVenue = r),
++                      ),
++                    ),
++            ),
++            const SizedBox(height: 16),
++            const Text('EXPECTED STUDENTS', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600)),
++            const SizedBox(height: 6),
++            _FieldContainer(
++              child: TextField(
++                controller: _expectedStudentsController,
++                keyboardType: TextInputType.number,
++                decoration: const InputDecoration(border: InputBorder.none, hintText: 'e.g. 44'),
++              ),
++            ),
++            const SizedBox(height: 16),
++          ],
++
++          const Text('TITLE', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600)),
++          const SizedBox(height: 6),
++          _FieldContainer(
++            child: TextField(
++              controller: _titleController,
++              decoration: const InputDecoration(border: InputBorder.none, hintText: 'e.g. Class rescheduled to Friday'),
++            ),
++          ),
++          const SizedBox(height: 16),
++
++          const Text('MESSAGE', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600)),
++          const SizedBox(height: 6),
++          _FieldContainer(
++            child: TextField(
++              controller: _messageController,
++              maxLines: 4,
++              decoration: const InputDecoration(border: InputBorder.none, hintText: 'Write your message to students…'),
++            ),
++          ),
++          const SizedBox(height: 20),
++
++          SizedBox(
++            width: double.infinity,
++            height: 50,
++            child: ElevatedButton(
++              onPressed: _sending ? null : _handleSend,
++              style: ElevatedButton.styleFrom(
++                backgroundColor: LecturerColors.orange,
++                foregroundColor: Colors.white,
++                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
++              ),
++              child: _sending
++                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
++                  : const Text('Send to Students', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
++            ),
++          ),
++        ],
++      ),
++    );
++  }
++}
++
++class _FieldContainer extends StatelessWidget {
++  final Widget child;
++  const _FieldContainer({required this.child});
++
++  @override
++  Widget build(BuildContext context) {
++    return Container(
++      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
++      decoration: BoxDecoration(
++        color: Theme.of(context).cardColor,
++        borderRadius: BorderRadius.circular(12),
++        border: Border.all(color: Colors.grey.shade300),
++      ),
++      child: child,
++    );
++  }
++}
++
++class _InfoRow extends StatelessWidget {
++  final String label;
++  final String value;
++  const _InfoRow({required this.label, required this.value});
++
++  @override
++  Widget build(BuildContext context) {
++    return Row(
++      crossAxisAlignment: CrossAxisAlignment.start,
++      children: [
++        SizedBox(width: 90, child: Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13))),
++        Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13))),
++      ],
++    );
++  }
++}
+diff --git a/lib/features/lecturer/presentation/screens/lecturer_schedule_tab.dart b/lib/features/lecturer/presentation/screens/lecturer_schedule_tab.dart
+new file mode 100644
+index 0000000..aed3a87
+--- /dev/null
++++ b/lib/features/lecturer/presentation/screens/lecturer_schedule_tab.dart
+@@ -0,0 +1,184 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import '../providers/lecturer_dashboard_provider.dart';
++import '../../domain/models/lecturer_dashboard_model.dart';
++import '../widgets/lecturer_colors.dart';
++
++const _dayOrder = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
++const _dayLabels = {
++  'MON': 'Mon', 'TUE': 'Tue', 'WED': 'Wed', 'THU': 'Thu',
++  'FRI': 'Fri', 'SAT': 'Sat', 'SUN': 'Sun',
++};
++const _dayFullNames = {
++  'MON': 'Monday', 'TUE': 'Tuesday', 'WED': 'Wednesday', 'THU': 'Thursday',
++  'FRI': 'Friday', 'SAT': 'Saturday', 'SUN': 'Sunday',
++};
++
++class LecturerScheduleTab extends ConsumerStatefulWidget {
++  const LecturerScheduleTab({super.key});
++
++  @override
++  ConsumerState<LecturerScheduleTab> createState() => _LecturerScheduleTabState();
++}
++
++class _LecturerScheduleTabState extends ConsumerState<LecturerScheduleTab> {
++  String? _selectedDay;
++
++  @override
++  Widget build(BuildContext context) {
++    final dashboardState = ref.watch(lecturerDashboardProvider);
++    final dashboard = dashboardState.dashboard;
++
++    if (dashboardState.isLoading && dashboard == null) {
++      return const Center(child: CircularProgressIndicator(color: LecturerColors.navy));
++    }
++    if (dashboard == null) {
++      return Center(
++        child: TextButton(
++          onPressed: () => ref.read(lecturerDashboardProvider.notifier).fetchDashboard(),
++          child: const Text('Retry loading schedule'),
++        ),
++      );
++    }
++
++    final selectedDay = _selectedDay ?? dashboard.today;
++    final sessionsForDay = dashboard.timetable[selectedDay] ?? [];
++
++    return RefreshIndicator(
++      onRefresh: () => ref.read(lecturerDashboardProvider.notifier).fetchDashboard(),
++      child: SingleChildScrollView(
++        physics: const AlwaysScrollableScrollPhysics(),
++        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
++        child: Column(
++          crossAxisAlignment: CrossAxisAlignment.start,
++          children: [
++            // ── Allocated Units card ─────────────────────────────────────
++            Container(
++              width: double.infinity,
++              padding: const EdgeInsets.all(18),
++              decoration: BoxDecoration(color: LecturerColors.navy, borderRadius: BorderRadius.circular(18)),
++              child: Column(
++                crossAxisAlignment: CrossAxisAlignment.start,
++                children: [
++                  const Text('ALLOCATED UNITS',
++                      style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
++                  const SizedBox(height: 4),
++                  Text(dashboard.currentTerm ?? '—',
++                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
++                  const SizedBox(height: 14),
++                  Wrap(
++                    spacing: 8,
++                    runSpacing: 8,
++                    children: dashboard.allocatedUnits
++                        .map((code) => Container(
++                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
++                              decoration: BoxDecoration(
++                                color: Colors.white.withValues(alpha: 0.12),
++                                borderRadius: BorderRadius.circular(20),
++                              ),
++                              child: Text(code, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
++                            ))
++                        .toList(),
++                  ),
++                  const SizedBox(height: 10),
++                  Text('${dashboard.allocatedUnits.length} units allocated',
++                      style: const TextStyle(color: Colors.white60, fontSize: 12)),
++                ],
++              ),
++            ),
++            const SizedBox(height: 20),
++
++            // ── Day selector ─────────────────────────────────────────────
++            SizedBox(
++              height: 44,
++              child: ListView.separated(
++                scrollDirection: Axis.horizontal,
++                itemCount: _dayOrder.length,
++                separatorBuilder: (_, __) => const SizedBox(width: 8),
++                itemBuilder: (context, i) {
++                  final day = _dayOrder[i];
++                  final isSelected = day == selectedDay;
++                  return GestureDetector(
++                    onTap: () => setState(() => _selectedDay = day),
++                    child: Container(
++                      padding: const EdgeInsets.symmetric(horizontal: 18),
++                      alignment: Alignment.center,
++                      decoration: BoxDecoration(
++                        color: isSelected ? LecturerColors.navy : Theme.of(context).cardColor,
++                        borderRadius: BorderRadius.circular(22),
++                        border: Border.all(color: isSelected ? LecturerColors.navy : Colors.grey.shade300),
++                      ),
++                      child: Text(
++                        _dayLabels[day]!,
++                        style: TextStyle(
++                          color: isSelected ? Colors.white : Colors.grey.shade700,
++                          fontWeight: FontWeight.w600,
++                          fontSize: 13,
++                        ),
++                      ),
++                    ),
++                  );
++                },
++              ),
++            ),
++            const SizedBox(height: 20),
++
++            Row(
++              mainAxisAlignment: MainAxisAlignment.spaceBetween,
++              children: [
++                Text(_dayFullNames[selectedDay]!, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
++                Text('${sessionsForDay.length} session${sessionsForDay.length == 1 ? '' : 's'}',
++                    style: const TextStyle(color: Colors.grey)),
++              ],
++            ),
++            const SizedBox(height: 12),
++
++            if (sessionsForDay.isEmpty)
++              const Padding(
++                padding: EdgeInsets.symmetric(vertical: 32),
++                child: Center(child: Text('No sessions this day.', style: TextStyle(color: Colors.grey))),
++              )
++            else
++              ...sessionsForDay.asMap().entries.map((entry) {
++                final colors = [LecturerColors.nowBorder, LecturerColors.amber, LecturerColors.green, LecturerColors.orange];
++                final color = colors[entry.key % colors.length];
++                return Padding(
++                  padding: const EdgeInsets.only(bottom: 12),
++                  child: _ScheduleSessionCard(session: entry.value, accentColor: color),
++                );
++              }),
++          ],
++        ),
++      ),
++    );
++  }
++}
++
++class _ScheduleSessionCard extends StatelessWidget {
++  final LecturerSessionModel session;
++  final Color accentColor;
++  const _ScheduleSessionCard({required this.session, required this.accentColor});
++
++  @override
++  Widget build(BuildContext context) {
++    return Container(
++      padding: const EdgeInsets.all(14),
++      decoration: BoxDecoration(
++        color: accentColor.withValues(alpha: 0.08),
++        borderRadius: BorderRadius.circular(12),
++        border: Border(left: BorderSide(color: accentColor, width: 4)),
++      ),
++      child: Column(
++        crossAxisAlignment: CrossAxisAlignment.start,
++        children: [
++          Text(session.timeRange, style: TextStyle(color: accentColor, fontWeight: FontWeight.w600, fontSize: 13)),
++          const SizedBox(height: 4),
++          Text(session.unitCode, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
++          const SizedBox(height: 2),
++          Text('${session.room} · ${session.program} · ${session.studentCount} students',
++              style: const TextStyle(fontSize: 12, color: Colors.grey)),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/features/lecturer/presentation/screens/lecturer_shell_screen.dart b/lib/features/lecturer/presentation/screens/lecturer_shell_screen.dart
+new file mode 100644
+index 0000000..5e0107a
+--- /dev/null
++++ b/lib/features/lecturer/presentation/screens/lecturer_shell_screen.dart
+@@ -0,0 +1,55 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'package:iconsax/iconsax.dart';
++import '../providers/lecturer_dashboard_provider.dart';
++import '../widgets/lecturer_colors.dart';
++import 'lecturer_home_tab.dart';
++import 'lecturer_schedule_tab.dart';
++import 'lecturer_profile_tab.dart';
++
++/// Route target for /lecturer/home — a single screen that owns bottom-nav
++/// state and switches between the three lecturer tabs, exactly like the
++/// student HomeScreen switches Home/Schedule/Profile internally.
++class LecturerShellScreen extends ConsumerStatefulWidget {
++  const LecturerShellScreen({super.key});
++
++  @override
++  ConsumerState<LecturerShellScreen> createState() => _LecturerShellScreenState();
++}
++
++class _LecturerShellScreenState extends ConsumerState<LecturerShellScreen> {
++  int _selectedIndex = 0;
++
++  @override
++  void initState() {
++    super.initState();
++    Future.microtask(() => ref.read(lecturerDashboardProvider.notifier).fetchDashboard());
++  }
++
++  final _tabs = const [
++    LecturerHomeTab(),
++    LecturerScheduleTab(),
++    LecturerProfileTab(),
++  ];
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
++      body: IndexedStack(index: _selectedIndex, children: _tabs),
++      bottomNavigationBar: BottomNavigationBar(
++        type: BottomNavigationBarType.fixed,
++        selectedItemColor: LecturerColors.navy,
++        unselectedItemColor: Colors.grey,
++        showUnselectedLabels: true,
++        currentIndex: _selectedIndex,
++        onTap: (i) => setState(() => _selectedIndex = i),
++        items: const [
++          BottomNavigationBarItem(icon: Icon(Iconsax.home), label: 'Home'),
++          BottomNavigationBarItem(icon: Icon(Iconsax.calendar), label: 'Schedule'),
++          BottomNavigationBarItem(icon: Icon(Iconsax.profile_circle), label: 'Profile'),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/features/lecturer/presentation/widgets/lecturer_colors.dart b/lib/features/lecturer/presentation/widgets/lecturer_colors.dart
+new file mode 100644
+index 0000000..4e466a2
+--- /dev/null
++++ b/lib/features/lecturer/presentation/widgets/lecturer_colors.dart
+@@ -0,0 +1,16 @@
++import 'package:flutter/material.dart';
++
++/// Lecturer-module palette — distinct from the student app's royal-blue
++/// theme (AppTheme.primary/accent) to match the SMARTClassCatch Lecturer
++/// mockups: near-black navy header, warm orange CTAs.
++class LecturerColors {
++  static const Color navy = Color(0xFF12144A);
++  static const Color navyDark = Color(0xFF0B0C33);
++  static const Color orange = Color(0xFFFF7A1A);
++  static const Color green = Color(0xFF1F9D55);
++  static const Color greenBg = Color(0xFFE3F6EA);
++  static const Color amber = Color(0xFFE08E0B);
++  static const Color amberBg = Color(0xFFFDF1DD);
++  static const Color nowBg = Color(0xFFE9F1FF);
++  static const Color nowBorder = Color(0xFF3355D8);
++}

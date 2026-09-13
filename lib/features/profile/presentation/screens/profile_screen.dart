@@ -115,24 +115,24 @@ class ProfileScreen extends ConsumerWidget {
                   (val) => ref.read(themeProvider.notifier).toggleTheme(),
                 ),
                 Consumer(
-                builder: (context, ref, _) {
-                final enabled = ref.watch(notificationsEnabledProvider);
-                return _buildToggleTile(
-                context,
-                Iconsax.notification,
-                context.tr('Push Notifications'),
-                enabled,
-                (val) async {
-                await ref.read(notificationsEnabledProvider.notifier).toggle(val);
-                if (val) {
-                await FCMService.registerToken();
-                } else {
-                await FCMService.unregisterToken();
-        }
-      },
-    );
-  },
-),
+                  builder: (context, ref, _) {
+                    final enabled = ref.watch(notificationsEnabledProvider);
+                    return _buildToggleTile(
+                      context,
+                      Iconsax.notification,
+                      context.tr('Push Notifications'),
+                      enabled,
+                      (val) async {
+                        await ref.read(notificationsEnabledProvider.notifier).toggle(val);
+                        if (val) {
+                          await FCMService.registerToken();
+                        } else {
+                          await FCMService.unregisterToken();
+                        }
+                      },
+                    );
+                  },
+                ),
                 // Language selector — shows a bottom sheet with English/Swahili
                 _buildLanguageTile(
                   context,
@@ -174,7 +174,6 @@ class ProfileScreen extends ConsumerWidget {
               context,
               title: context.tr('Account'),
               children: [
-                _buildActionTile(context, Iconsax.lock, context.tr('Change Password'), null, () {}),
                 _buildActionTile(
                   context,
                   Iconsax.trash,
