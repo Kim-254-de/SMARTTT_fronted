@@ -7,7 +7,9 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../widgets/premium_button.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_text_field.dart';
+import '../widgets/auth_dropdown_field.dart';
 import '../widgets/social_auth_buttons.dart';
+import '../../domain/models/department_model.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -22,8 +24,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _admissionController = TextEditingController();
+  final _staffIdController = TextEditingController();
   bool _acceptedPrivacy = false;
   bool _acceptedTerms = false;
+  DepartmentModel? _selectedDepartment;
 
   @override
   void dispose() {
@@ -32,12 +36,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _admissionController.dispose();
+    _staffIdController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final selectedRole = ref.watch(selectedRoleProvider);
+    final isLecturer = selectedRole == 'lecturer';
+    final roleLabel = isLecturer ? 'Lecturer' : 'Student';
 
      ref.listen(authProvider, (previous, next) {
        if (next.error != null) {
@@ -46,7 +54,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
          );
        }
        if (next.user != null) {
-         context.go('/home');
+         context.go(isLecturer ? '/lecturer/home' : '/home');
        }
      });
 
@@ -71,7 +79,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               
               const SizedBox(height: 40),
               Text(
-                'Create Account',
+                'Create $roleLabel Account',
                 style: Theme.of(context).textTheme.displayLarge,
               ).animate().fadeIn().moveX(begin: -20),
               
@@ -92,16 +100,49 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               const SizedBox(height: 20),
               
               AuthTextField(
-                controller: _admissionController,
-                hintText: 'Admission Number',
+                controller: isLecturer ? _staffIdController : _admissionController,
+                hintText: isLecturer ? 'Staff ID' : 'Admission Number',
                 icon: Iconsax.hashtag,
               ).animate().fadeIn(delay: 250.ms).moveY(begin: 10),
+
+              if (isLecturer) ...[
+                const SizedBox(height: 20),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final departmentsAsync = ref.watch(departmentsProvider);
+                    return departmentsAsync.when(
+                      data: (departments) => AuthDropdownField(
+                        hintText: 'Department',
+                        icon: Iconsax.building,
+                        items: departments,
+                        value: _selectedDepartment,
+                        onChanged: (dept) => setState(() => _selectedDepartment = dept),
+                      ),
+                      loading: () => AuthDropdownField(
+                        hintText: 'Department',
+                        icon: Iconsax.building,
+                        items: const [],
+                        value: null,
+                        onChanged: (_) {},
+                        isLoading: true,
+                      ),
+                      error: (_, __) => AuthDropdownField(
+                        hintText: 'Department (failed to load)',
+                        icon: Iconsax.building,
+                        items: const [],
+                        value: null,
+                        onChanged: (_) {},
+                      ),
+                    );
+                  },
+                ).animate().fadeIn(delay: 300.ms).moveY(begin: 10),
+              ],
               
               const SizedBox(height: 20),
               
               AuthTextField(
                 controller: _emailController,
-                hintText: 'Student Email',
+                hintText: isLecturer ? 'Staff Email' : 'Student Email',
                 icon: Iconsax.sms,
               ).animate().fadeIn(delay: 400.ms).moveY(begin: 10),
               
@@ -213,6 +254,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     if (_passwordController.text != _confirmPasswordController.text) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Passwords do not match'), backgroundColor: AppTheme.error),
+                      );
+                      return;
+                    }
+                    if (isLecturer) {
+                      if (_selectedDepartment == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please select your department'), backgroundColor: AppTheme.error),
+                        );
+                        return;
+                      }
+                      ref.read(authProvider.notifier).registerLecturer(
+                        fullName: _nameController.text,
+                        email: _emailController.text,
+                        staffId: _staffIdController.text,
+                        password: _passwordController.text,
+                        departmentId: _selectedDepartment!.id,
                       );
                       return;
                     }
