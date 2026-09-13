@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/auth_repository.dart';
+import '../../domain/models/department_model.dart';
 import '../../domain/models/user_model.dart';
 import '../../../notifications/services/fcm_service.dart';
 
@@ -91,6 +92,30 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  Future<void> registerLecturer({
+    required String fullName,
+    required String email,
+    required String staffId,
+    required String password,
+    required String departmentId,
+  }) async {
+    final repository = ref.read(authRepositoryProvider);
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final user = await repository.registerLecturer(
+        fullName: fullName,
+        email: email,
+        staffId: staffId,
+        password: password,
+        departmentId: departmentId,
+      );
+      state = AuthState(user: user, isLoading: false);
+      Future.microtask(() => FCMService.registerToken());
+    } catch (e) {
+      state = AuthState(isLoading: false, error: _extractErrorMessage(e));
+    }
+  }
+
   /// Called after a successful Google sign-in — skips the repository
   /// since token storage and API call are handled in SocialAuthButtons.
   void setUserFromGoogle(UserModel user) {
@@ -129,11 +154,20 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 }
+
 /// Set by RoleSelectScreen (the very first screen at '/') when the person
 /// taps "Student" or "Lecturer". Read by RegisterScreen to preselect the
 /// matching tab, and by LoginScreen for contextual heading text. Purely a
 /// UX convenience — the backend still auto-detects the actual role from
 /// whichever account logs in, this never gates access.
 final selectedRoleProvider = StateProvider<String>((ref) => 'student');
+
 final authRepositoryProvider = Provider((ref) => AuthRepository());
 final authProvider = NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
+
+/// Fetched once per app session for the lecturer-registration department
+/// picker. Public endpoint — no auth needed, so this is safe to call from
+/// the register screen before the person has an account.
+final departmentsProvider = FutureProvider<List<DepartmentModel>>((ref) {
+  return ref.read(authRepositoryProvider).fetchDepartments();
+});

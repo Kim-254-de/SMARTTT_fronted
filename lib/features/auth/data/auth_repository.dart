@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
+import '../domain/models/department_model.dart';
 import '../domain/models/user_model.dart';
 
 class AuthRepository {
@@ -41,6 +42,52 @@ class AuthRepository {
       await _storeTokens(response.data);
       final userData = _extractUserData(response.data);
       return UserModel.fromJson(userData);
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Registers a new lecturer.
+  /// Backend validates staff_id against the pre-loaded ValidStaffID list
+  /// (uploaded by admin/ICT) — registration fails with a clear message if
+  /// the staff ID isn't recognised or has already been claimed.
+  Future<UserModel> registerLecturer({
+    required String fullName,
+    required String email,
+    required String staffId,
+    required String password,
+    required String departmentId,
+  }) async {
+    try {
+      final response = await apiClient.dio.post('auth/lecturer/register/', data: {
+        'full_name': fullName,
+        'email': email,
+        'staff_id': staffId,
+        'password': password,
+        'department': departmentId,
+      });
+
+      await _storeTokens(response.data);
+      final userData = _extractUserData(response.data);
+      final user = UserModel.fromJson(userData);
+      return user;
+    } catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// GET /departments/departments/ — public (read-only for unauthenticated
+  /// users), used to populate the department picker on lecturer registration.
+  Future<List<DepartmentModel>> fetchDepartments() async {
+    try {
+      final response = await apiClient.dio.get('departments/departments/');
+      final dynamic data = response.data;
+      final List<dynamic> results = data is Map && data['results'] is List
+          ? data['results'] as List
+          : (data is List ? data : []);
+      return results
+          .map((json) => DepartmentModel.fromJson(json as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       throw _handleError(e);
     }
