@@ -1,157 +1,237 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/lecturer_dashboard_provider.dart';
-import '../../domain/models/lecturer_dashboard_model.dart';
+import '../../domain/models/lecturer_dashboard_model.dart'; // Correct relative path
 import '../widgets/lecturer_colors.dart';
 
-class LecturerHomeTab extends ConsumerWidget {
+class LecturerHomeTab extends ConsumerStatefulWidget {
   const LecturerHomeTab({super.key});
 
-  String _formatDate(DateTime now) {
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    return '${days[now.weekday - 1]}, ${now.day} ${months[now.month - 1]} ${now.year}';
-  }
+  @override
+  ConsumerState<LecturerHomeTab> createState() => _LecturerHomeTabState();
+}
+
+class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
+  String? selectedUnitIdForRoster;
+  String? selectedUnitLabel;
+  List<dynamic> rosterStudents = [];
+  bool isLoadingRoster = false;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authProvider);
+  Widget build(BuildContext context) {
     final dashboardState = ref.watch(lecturerDashboardProvider);
-    final user = authState.user;
     final dashboard = dashboardState.dashboard;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
-    final now = DateTime.now();
-    String greeting = 'Good Morning';
-    if (now.hour >= 12 && now.hour < 16) {
-      greeting = 'Good Afternoon';
-    } else if (now.hour >= 16) {
-      greeting = 'Good Evening';
+    if (dashboardState.isLoading && dashboard == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final firstName = (user?.fullName ?? 'Lecturer').split(' ').first;
-
-    return RefreshIndicator(
-      onRefresh: () => ref.read(lecturerDashboardProvider.notifier).fetchDashboard(),
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ── Header ────────────────────────────────────────────────────
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 60, 20, 28),
-              decoration: const BoxDecoration(
-                color: LecturerColors.navy,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(24),
-                  bottomRight: Radius.circular(24),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return Scaffold(
+      backgroundColor: isDarkMode ? const Color(0xFF121212) : const Color(0xFFF7F8FA),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(lecturerDashboardProvider.notifier).fetchDashboard();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('👋 $greeting,', style: const TextStyle(color: Colors.white70, fontSize: 15)),
-                  const SizedBox(height: 2),
-                  Text(
-                    firstName,
-                    style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold),
+                  const Text(
+                    'Lecturer Portal',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 6),
-                  Text(_formatDate(now), style: const TextStyle(color: Colors.white60, fontSize: 13)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: LecturerColors.navyBg,
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Text(
+                      dashboard?.currentTerm ?? 'Active Term',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: LecturerColors.primary),
+                    ),
+                  ),
                 ],
               ),
-            ),
-
-            if (dashboardState.isLoading && dashboard == null)
-              const Padding(
-                padding: EdgeInsets.only(top: 60),
-                child: Center(child: CircularProgressIndicator(color: LecturerColors.navy)),
-              )
-            else if (dashboardState.error != null && dashboard == null)
-              Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  children: [
-                    Text(dashboardState.error!, textAlign: TextAlign.center),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () => ref.read(lecturerDashboardProvider.notifier).fetchDashboard(),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              )
-            else if (dashboard != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── Row 1: units / weekly sessions / total students ───
-                    Row(
-                      children: [
-                        Expanded(child: _StatCard(value: '${dashboard.summary.unitsCount}', label: 'Units This Term', color: LecturerColors.navy)),
-                        const SizedBox(width: 10),
-                        Expanded(child: _StatCard(value: '${dashboard.summary.weeklySessions}', label: 'Weekly Sessions', color: LecturerColors.orange)),
-                        const SizedBox(width: 10),
-                        Expanded(child: _StatCard(value: '${dashboard.summary.totalStudents}', label: 'Total Students', color: LecturerColors.green)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // ── Row 2: completed / remaining today ────────────────
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _BigStatCard(
-                            value: '${dashboard.summary.completedToday}',
-                            label: 'Completed Today',
-                            bg: LecturerColors.greenBg,
-                            fg: LecturerColors.green,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _BigStatCard(
-                            value: '${dashboard.summary.remainingToday}',
-                            label: 'Remaining Today',
-                            bg: LecturerColors.amberBg,
-                            fg: LecturerColors.amber,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text("Today's Sessions", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                        Text(dashboard.today[0] + dashboard.today.substring(1).toLowerCase(),
-                            style: const TextStyle(color: Colors.grey)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    if (dashboard.todaySessions.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
-                        child: Center(child: Text('No sessions scheduled for today.', style: TextStyle(color: Colors.grey))),
-                      )
-                    else
-                      ...dashboard.todaySessions.map((s) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _SessionCard(session: s),
-                          )),
-                  ],
-                ),
+              const SizedBox(height: 20),
+              _buildStatsStrip(dashboard?.summary),
+              const SizedBox(height: 24),
+              const Text(
+                'My Timetable',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
               ),
+              const SizedBox(height: 12),
+              _buildTimetableSection(dashboard?.timetable ?? {}),
+              if (selectedUnitIdForRoster != null) ...[
+                const SizedBox(height: 24),
+                _buildStudentRosterCard(),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsStrip(LecturerSummaryModel? summary) {
+    return Row(
+      children: [
+        Expanded(child: _StatCard(value: '${summary?.unitsCount ?? 0}', label: 'Units this term')),
+        const SizedBox(width: 12),
+        Expanded(child: _StatCard(value: '${summary?.weeklySessions ?? 0}', label: 'Weekly sessions')),
+        const SizedBox(width: 12),
+        Expanded(child: _StatCard(value: '${summary?.totalStudents ?? 0}', label: 'Total students')),
+      ],
+    );
+  }
+
+  Widget _buildTimetableSection(Map<String, List<LecturerSessionModel>> timetable) {
+    const dayOrder = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    final dayNames = {'MON': 'Monday', 'TUE': 'Tuesday', 'WED': 'Wednesday', 'THU': 'Thursday', 'FRI': 'Friday', 'SAT': 'Saturday'};
+
+    final activeDays = dayOrder.where((d) => timetable.containsKey(d) && timetable[d]!.isNotEmpty).toList();
+
+    if (activeDays.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(30),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+        child: const Text('No classes assigned for this term yet.', style: TextStyle(color: Colors.grey)),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: activeDays.map((day) {
+        final sessions = timetable[day]!;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: LecturerColors.navyBg,
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Text(
+                dayNames[day] ?? day,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: LecturerColors.primary),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...sessions.map((slot) => _buildSlotCard(slot)),
+            const SizedBox(height: 16),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildSlotCard(LecturerSessionModel slot) {
+    return InkWell(
+      onTap: () => fetchStudentsForUnit(slot.unitId, '${slot.unitCode} — ${slot.unitName}'),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: const Border(
+            top: BorderSide(color: Color(0xFFE2E8F0)),
+            right: BorderSide(color: Color(0xFFE2E8F0)),
+            bottom: BorderSide(color: Color(0xFFE2E8F0)),
+            left: BorderSide(color: LecturerColors.primary, width: 4), // Correct left border styling
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              slot.timeRange,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: LecturerColors.primary),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              slot.unitName,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              '${slot.unitCode} ${slot.room.isNotEmpty ? '· ${slot.room}' : ''} ${slot.program.isNotEmpty ? '· ${slot.program}' : ''}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> fetchStudentsForUnit(String unitId, String unitLabel) async {
+    setState(() {
+      selectedUnitIdForRoster = unitId;
+      selectedUnitLabel = unitLabel;
+      isLoadingRoster = true;
+    });
+
+    try {
+      final roster = await ref.read(lecturerRepositoryProvider).fetchRooms();
+      setState(() {
+        rosterStudents = [];
+        isLoadingRoster = false;
+      });
+    } catch (_) {
+      setState(() => isLoadingRoster = false);
+    }
+  }
+
+  Widget _buildStudentRosterCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Students — ${selectedUnitLabel ?? ""}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              IconButton(
+                icon: const Icon(Icons.close, size: 16),
+                onPressed: () => setState(() => selectedUnitIdForRoster = null),
+              ),
+            ],
+          ),
+          const Divider(),
+          isLoadingRoster
+              ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+              : rosterStudents.isEmpty
+                  ? const Padding(padding: EdgeInsets.all(20), child: Text('No enrolled students data loaded.', style: TextStyle(color: Colors.grey)))
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: rosterStudents.length,
+                      itemBuilder: (context, idx) {
+                        final s = rosterStudents[idx];
+                        return ListTile(
+                          dense: true,
+                          title: Text(s['name'] ?? 'Student'),
+                          subtitle: Text(s['email'] ?? ''),
+                          trailing: Chip(label: Text(s['university_id'] ?? 'ID')),
+                        );
+                      },
+                    ),
+        ],
       ),
     );
   }
@@ -160,101 +240,23 @@ class LecturerHomeTab extends ConsumerWidget {
 class _StatCard extends StatelessWidget {
   final String value;
   final String label;
-  final Color color;
-  const _StatCard({required this.value, required this.label, required this.color});
+
+  const _StatCard({required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2))],
-      ),
-      child: Column(
-        children: [
-          Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
-          const SizedBox(height: 4),
-          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-        ],
-      ),
-    );
-  }
-}
-
-class _BigStatCard extends StatelessWidget {
-  final String value;
-  final String label;
-  final Color bg;
-  final Color fg;
-  const _BigStatCard({required this.value, required this.label, required this.bg, required this.fg});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 18),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(16)),
-      child: Column(
-        children: [
-          Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: fg)),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(fontSize: 12, color: fg.withValues(alpha: 0.85), fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-}
-
-class _SessionCard extends StatelessWidget {
-  final LecturerSessionModel session;
-  const _SessionCard({required this.session});
-
-  @override
-  Widget build(BuildContext context) {
-    final isNow = session.status == 'now';
-    final bg = isNow ? LecturerColors.navyBg : LecturerColors.amberBg;
-    final borderColor = isNow ? LecturerColors.navyBorder : LecturerColors.amber;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: bg,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border(left: BorderSide(color: borderColor, width: 4)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(session.timeRange, style: TextStyle(color: borderColor, fontWeight: FontWeight.w600, fontSize: 13)),
-                const SizedBox(height: 4),
-                Text(session.unitCode, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 2),
-                Text('${session.room} · ${session.program} · ${session.studentCount} students',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              ],
-            ),
-          ),
-          if (session.status != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: isNow ? LecturerColors.navyBorder : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                session.status == 'now' ? 'Now' : (session.status == 'completed' ? 'Done' : 'Upcoming'),
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: isNow ? Colors.white : LecturerColors.amber,
-                ),
-              ),
-            ),
+          Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: LecturerColors.primary)),
+          const SizedBox(height: 2),
+          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
         ],
       ),
     );

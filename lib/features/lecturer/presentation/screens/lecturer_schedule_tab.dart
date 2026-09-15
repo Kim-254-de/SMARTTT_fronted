@@ -1,18 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/lecturer_dashboard_provider.dart';
-import '../../domain/models/lecturer_dashboard_model.dart';
 import '../widgets/lecturer_colors.dart';
-
-const _dayOrder = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-const _dayLabels = {
-  'MON': 'Mon', 'TUE': 'Tue', 'WED': 'Wed', 'THU': 'Thu',
-  'FRI': 'Fri', 'SAT': 'Sat', 'SUN': 'Sun',
-};
-const _dayFullNames = {
-  'MON': 'Monday', 'TUE': 'Tuesday', 'WED': 'Wednesday', 'THU': 'Thursday',
-  'FRI': 'Friday', 'SAT': 'Saturday', 'SUN': 'Sunday',
-};
 
 class LecturerScheduleTab extends ConsumerStatefulWidget {
   const LecturerScheduleTab({super.key});
@@ -22,161 +11,189 @@ class LecturerScheduleTab extends ConsumerStatefulWidget {
 }
 
 class _LecturerScheduleTabState extends ConsumerState<LecturerScheduleTab> {
-  String? _selectedDay;
+  String selectedDay = 'MON';
+  final List<String> days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
   @override
   Widget build(BuildContext context) {
     final dashboardState = ref.watch(lecturerDashboardProvider);
-    final dashboard = dashboardState.dashboard;
+    final timetable = dashboardState.dashboard?.timetable ?? {};
+    final sessionsForDay = timetable[selectedDay] ?? [];
+    
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
-    if (dashboardState.isLoading && dashboard == null) {
-      return const Center(child: CircularProgressIndicator(color: LecturerColors.navy));
-    }
-    if (dashboard == null) {
-      return Center(
-        child: TextButton(
-          onPressed: () => ref.read(lecturerDashboardProvider.notifier).fetchDashboard(),
-          child: const Text('Retry loading schedule'),
-        ),
-      );
-    }
-
-    final selectedDay = _selectedDay ?? dashboard.today;
-    final sessionsForDay = dashboard.timetable[selectedDay] ?? [];
-
-    return RefreshIndicator(
-      onRefresh: () => ref.read(lecturerDashboardProvider.notifier).fetchDashboard(),
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Allocated Units card ─────────────────────────────────────
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(color: LecturerColors.navy, borderRadius: BorderRadius.circular(18)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('ALLOCATED UNITS',
-                      style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
-                  const SizedBox(height: 4),
-                  Text(dashboard.currentTerm ?? '—',
-                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: dashboard.allocatedUnits
-                        .map((code) => Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(code, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                            ))
-                        .toList(),
-                  ),
-                  const SizedBox(height: 10),
-                  Text('${dashboard.allocatedUnits.length} units allocated',
-                      style: const TextStyle(color: Colors.white60, fontSize: 12)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ── Day selector ─────────────────────────────────────────────
-            SizedBox(
-              height: 44,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _dayOrder.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, i) {
-                  final day = _dayOrder[i];
-                  final isSelected = day == selectedDay;
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedDay = day),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 18),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: isSelected ? LecturerColors.navy : Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: isSelected ? LecturerColors.navy : Colors.grey.shade300),
-                      ),
-                      child: Text(
-                        _dayLabels[day]!,
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.grey.shade700,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
+    return Scaffold(
+      backgroundColor: isDarkMode ? const Color(0xFF121212) : Colors.white,
+      appBar: AppBar(
+        title: const Text('Teaching Schedule', style: TextStyle(fontWeight: FontWeight.bold)),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        foregroundColor: isDarkMode ? Colors.white : Colors.black87,
+        centerTitle: false,
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildDaySelector(isDarkMode),
+          Expanded(
+            child: sessionsForDay.isEmpty
+                ? const Center(child: Text('No classes scheduled for this day.'))
+                : ListView.builder(
+                    padding: const EdgeInsets.all(20),
+                    itemCount: sessionsForDay.length,
+                    itemBuilder: (context, index) {
+                      final session = sessionsForDay[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildScheduleCard(
+                          time: session.timeRange,
+                          unitCode: session.unitCode,
+                          unitName: session.unitName,
+                          venue: session.room,
+                          group: session.program,
+                          studentCount: session.studentCount,
+                          isDarkMode: isDarkMode,
                         ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(_dayFullNames[selectedDay]!, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Text('${sessionsForDay.length} session${sessionsForDay.length == 1 ? '' : 's'}',
-                    style: const TextStyle(color: Colors.grey)),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            if (sessionsForDay.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Center(child: Text('No sessions this day.', style: TextStyle(color: Colors.grey))),
-              )
-            else
-              ...sessionsForDay.asMap().entries.map((entry) {
-                final colors = [LecturerColors.navyBorder, LecturerColors.amber, LecturerColors.green, LecturerColors.orange];
-                final color = colors[entry.key % colors.length];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _ScheduleSessionCard(session: entry.value, accentColor: color),
-                );
-              }),
-          ],
-        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }
-}
 
-class _ScheduleSessionCard extends StatelessWidget {
-  final LecturerSessionModel session;
-  final Color accentColor;
-  const _ScheduleSessionCard({required this.session, required this.accentColor});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildDaySelector(bool isDarkMode) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      height: 70,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: days.length,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemBuilder: (context, index) {
+          final day = days[index];
+          final isSelected = day == selectedDay;
+          return GestureDetector(
+            onTap: () => setState(() => selectedDay = day),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 60,
+              margin: const EdgeInsets.only(right: 10),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? LecturerColors.navy
+                    : (isDarkMode ? const Color(0xFF1E1E1E) : Colors.white),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isSelected
+                      ? LecturerColors.navy
+                      : (isDarkMode ? Colors.grey[800]! : const Color(0xFFE0E0E0)),
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    day,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: isSelected ? Colors.white : (isDarkMode ? Colors.grey[400] : Colors.black87),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildScheduleCard({
+    required String time,
+    required String unitCode,
+    required String unitName,
+    required String venue,
+    required String group,
+    required int studentCount,
+    required bool isDarkMode,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border(left: BorderSide(color: accentColor, width: 4)),
+        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDarkMode ? Colors.grey[800]! : const Color(0xFFE0E0E0),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(session.timeRange, style: TextStyle(color: accentColor, fontWeight: FontWeight.w600, fontSize: 13)),
-          const SizedBox(height: 4),
-          Text(session.unitCode, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 2),
-          Text('${session.room} · ${session.program} · ${session.studentCount} students',
-              style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.access_time_rounded, size: 14, color: LecturerColors.navy),
+                  const SizedBox(width: 6),
+                  Text(
+                    time,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: LecturerColors.navy),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: LecturerColors.navyBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  unitCode,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: LecturerColors.navy),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  unitName,
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black87),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Divider(height: 1, color: isDarkMode ? Colors.grey[800] : const Color(0xFFE0E0E0)),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.location_on_outlined, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(venue, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+              Row(
+                children: [
+                  const Icon(Icons.group_outlined, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text('$studentCount Students • $group', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     );

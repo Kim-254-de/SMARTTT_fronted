@@ -96,7 +96,8 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
 
     try {
       final dio = apiClient.dio;
-      await dio.patch('accounts/profile/', data: {
+      // Change 'accounts/profile/' to 'auth/profile/'
+      await dio.patch('auth/profile/', data: {
         'course': _selectedCourseName,
         'department': 'General',
         'year_of_study': _selectedYear,

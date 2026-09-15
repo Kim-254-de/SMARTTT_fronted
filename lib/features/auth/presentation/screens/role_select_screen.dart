@@ -16,7 +16,7 @@ class RoleSelectScreen extends ConsumerWidget {
   const RoleSelectScreen({super.key});
 
   void _choose(BuildContext context, WidgetRef ref, String role) {
-    ref.read(selectedRoleProvider.notifier).state = role;
+    ref.read(selectedRoleProvider.notifier).setRole(role);
     context.go('/login');
   }
 

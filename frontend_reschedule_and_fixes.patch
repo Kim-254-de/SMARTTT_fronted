@@ -1,0 +1,326 @@
+diff --git a/lib/features/lecturer/data/lecturer_repository.dart b/lib/features/lecturer/data/lecturer_repository.dart
+index ab6214c..a585a18 100644
+--- a/lib/features/lecturer/data/lecturer_repository.dart
++++ b/lib/features/lecturer/data/lecturer_repository.dart
+@@ -11,6 +11,13 @@ class VenueCapacityException implements Exception {
+   VenueCapacityException(this.message, this.suggestedRooms);
+ }
+ 
++/// Thrown when a reschedule collides with another class already booked
++/// in the requested room at the requested day/time.
++class RescheduleConflictException implements Exception {
++  final String message;
++  RescheduleConflictException(this.message);
++}
++
+ class LecturerRepository {
+   /// GET /auth/lecturer/profile/ — single call that feeds Home, Schedule
+   /// and Profile. See apps/accounts/views/auth_views.py::LecturerProfileView.
+@@ -102,6 +109,38 @@ class LecturerRepository {
+     }
+   }
+ 
++  /// POST /timetable/slots/{slotId}/reschedule/
++  /// Moves a class to a new day/time/room. Only allowed for slots this
++  /// lecturer actually teaches (enforced server-side). On success, the
++  /// backend also notifies every enrolled student — nothing further to
++  /// send from the app.
++  Future<void> rescheduleSlot({
++    required String slotId,
++    String? dayOfWeek, // 'mon'..'sat' — matches TimetableSlot.WeekDay values
++    String? startTime, // 'HH:mm' or 'HH:mm:ss'
++    String? endTime,
++    String? roomId,
++    String? reason,
++  }) async {
++    try {
++      await apiClient.dio.post('timetable/slots/$slotId/reschedule/', data: {
++        if (dayOfWeek != null) 'day_of_week': dayOfWeek,
++        if (startTime != null) 'start_time': startTime,
++        if (endTime != null) 'end_time': endTime,
++        if (roomId != null) 'room': roomId,
++        if (reason != null && reason.isNotEmpty) 'reason': reason,
++      });
++    } on DioException catch (e) {
++      if (e.response?.statusCode == 409) {
++        final detail = (e.response?.data is Map) ? e.response?.data['detail'] : null;
++        throw RescheduleConflictException(detail?.toString() ?? 'That room is already booked at that time.');
++      }
++      throw _handleError(e);
++    } catch (e) {
++      throw _handleError(e);
++    }
++  }
++
+   Exception _handleError(Object e) {
+     if (e is DioException) {
+       final data = e.response?.data;
+diff --git a/lib/features/lecturer/presentation/screens/lecturer_schedule_tab.dart b/lib/features/lecturer/presentation/screens/lecturer_schedule_tab.dart
+index df2481e..64846c1 100644
+--- a/lib/features/lecturer/presentation/screens/lecturer_schedule_tab.dart
++++ b/lib/features/lecturer/presentation/screens/lecturer_schedule_tab.dart
+@@ -1,6 +1,7 @@
+ import 'package:flutter/material.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import '../providers/lecturer_dashboard_provider.dart';
++import '../../data/lecturer_repository.dart';
+ import '../../domain/models/lecturer_dashboard_model.dart';
+ import '../widgets/lecturer_colors.dart';
+ 
+@@ -13,6 +14,10 @@ const _dayFullNames = {
+   'MON': 'Monday', 'TUE': 'Tuesday', 'WED': 'Wednesday', 'THU': 'Thursday',
+   'FRI': 'Friday', 'SAT': 'Saturday', 'SUN': 'Sunday',
+ };
++// Backend TimetableSlot.WeekDay values — lowercase, no Sunday (no classes).
++const _dayApiValues = {
++  'MON': 'mon', 'TUE': 'tue', 'WED': 'wed', 'THU': 'thu', 'FRI': 'fri', 'SAT': 'sat',
++};
+ 
+ class LecturerScheduleTab extends ConsumerStatefulWidget {
+   const LecturerScheduleTab({super.key});
+@@ -168,15 +173,240 @@ class _ScheduleSessionCard extends StatelessWidget {
+         borderRadius: BorderRadius.circular(12),
+         border: Border(left: BorderSide(color: accentColor, width: 4)),
+       ),
++      child: Row(
++        crossAxisAlignment: CrossAxisAlignment.start,
++        children: [
++          Expanded(
++            child: Column(
++              crossAxisAlignment: CrossAxisAlignment.start,
++              children: [
++                Text(session.timeRange, style: TextStyle(color: accentColor, fontWeight: FontWeight.w600, fontSize: 13)),
++                const SizedBox(height: 4),
++                Text(session.unitCode, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
++                const SizedBox(height: 2),
++                Text('${session.room} · ${session.program} · ${session.studentCount} students',
++                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
++              ],
++            ),
++          ),
++          IconButton(
++            tooltip: 'Reschedule this class',
++            icon: Icon(Icons.edit_calendar_outlined, color: accentColor, size: 20),
++            onPressed: () => showRescheduleSheet(context, session),
++          ),
++        ],
++      ),
++    );
++  }
++}
++
++/// Bottom sheet for POST /timetable/slots/{id}/reschedule/.
++/// On success, refreshes the dashboard so this lecturer sees the new
++/// day/time/room immediately — students see it the next time they open
++/// their own schedule, since it's read live from the same TimetableSlot.
++Future<void> showRescheduleSheet(BuildContext context, LecturerSessionModel session) {
++  return showModalBottomSheet(
++    context: context,
++    isScrollControlled: true,
++    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
++    builder: (_) => _RescheduleSheet(session: session),
++  );
++}
++
++class _RescheduleSheet extends ConsumerStatefulWidget {
++  final LecturerSessionModel session;
++  const _RescheduleSheet({required this.session});
++
++  @override
++  ConsumerState<_RescheduleSheet> createState() => _RescheduleSheetState();
++}
++
++class _RescheduleSheetState extends ConsumerState<_RescheduleSheet> {
++  late String _day;
++  late TimeOfDay _startTime;
++  late TimeOfDay _endTime;
++  RoomModel? _selectedRoom;
++  List<RoomModel> _rooms = [];
++  bool _roomsLoading = true;
++  bool _submitting = false;
++  final _reasonController = TextEditingController();
++
++  @override
++  void initState() {
++    super.initState();
++    _day = widget.session.day; // e.g. 'MON'
++    _startTime = _parseTime(widget.session.startTime);
++    _endTime = _parseTime(widget.session.endTime);
++    _loadRooms();
++  }
++
++  @override
++  void dispose() {
++    _reasonController.dispose();
++    super.dispose();
++  }
++
++  TimeOfDay _parseTime(String hhmm) {
++    final parts = hhmm.split(':');
++    final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 8 : 8;
++    final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
++    return TimeOfDay(hour: hour, minute: minute);
++  }
++
++  String _formatTime(TimeOfDay t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
++
++  Future<void> _loadRooms() async {
++    try {
++      final rooms = await ref.read(lecturerRepositoryProvider).fetchRooms();
++      if (mounted) setState(() { _rooms = rooms; _roomsLoading = false; });
++    } catch (_) {
++      if (mounted) setState(() => _roomsLoading = false);
++    }
++  }
++
++  Future<void> _pickTime({required bool isStart}) async {
++    final picked = await showTimePicker(context: context, initialTime: isStart ? _startTime : _endTime);
++    if (picked == null) return;
++    setState(() {
++      if (isStart) {
++        _startTime = picked;
++      } else {
++        _endTime = picked;
++      }
++    });
++  }
++
++  Future<void> _submit() async {
++    final startMinutes = _startTime.hour * 60 + _startTime.minute;
++    final endMinutes = _endTime.hour * 60 + _endTime.minute;
++    if (endMinutes <= startMinutes) {
++      ScaffoldMessenger.of(context).showSnackBar(
++        const SnackBar(content: Text('End time must be after start time.')),
++      );
++      return;
++    }
++
++    setState(() => _submitting = true);
++    try {
++      await ref.read(lecturerRepositoryProvider).rescheduleSlot(
++            slotId: widget.session.id,
++            dayOfWeek: _dayApiValues[_day],
++            startTime: _formatTime(_startTime),
++            endTime: _formatTime(_endTime),
++            roomId: _selectedRoom?.id,
++            reason: _reasonController.text.trim(),
++          );
++      if (!mounted) return;
++      await ref.read(lecturerDashboardProvider.notifier).fetchDashboard();
++      if (!mounted) return;
++      Navigator.of(context).pop();
++      ScaffoldMessenger.of(context).showSnackBar(
++        const SnackBar(content: Text('Class rescheduled — students have been notified.')),
++      );
++    } on RescheduleConflictException catch (e) {
++      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
++    } catch (e) {
++      ScaffoldMessenger.of(context).showSnackBar(
++        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
++      );
++    } finally {
++      if (mounted) setState(() => _submitting = false);
++    }
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    return Padding(
++      padding: EdgeInsets.only(
++        left: 20, right: 20, top: 20,
++        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
++      ),
+       child: Column(
++        mainAxisSize: MainAxisSize.min,
+         crossAxisAlignment: CrossAxisAlignment.start,
+         children: [
+-          Text(session.timeRange, style: TextStyle(color: accentColor, fontWeight: FontWeight.w600, fontSize: 13)),
++          Text('Reschedule ${widget.session.unitCode}',
++              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+           const SizedBox(height: 4),
+-          Text(session.unitCode, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+-          const SizedBox(height: 2),
+-          Text('${session.room} · ${session.program} · ${session.studentCount} students',
+-              style: const TextStyle(fontSize: 12, color: Colors.grey)),
++          Text('Currently ${_dayFullNames[widget.session.day]} ${widget.session.timeRange} · ${widget.session.room}',
++              style: const TextStyle(fontSize: 13, color: Colors.grey)),
++          const SizedBox(height: 20),
++
++          const Text('Day', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
++          const SizedBox(height: 8),
++          Wrap(
++            spacing: 8,
++            children: _dayApiValues.keys.map((day) {
++              final isSelected = day == _day;
++              return ChoiceChip(
++                label: Text(_dayLabels[day]!),
++                selected: isSelected,
++                onSelected: (_) => setState(() => _day = day),
++                selectedColor: LecturerColors.navy,
++                labelStyle: TextStyle(color: isSelected ? Colors.white : null),
++              );
++            }).toList(),
++          ),
++          const SizedBox(height: 20),
++
++          Row(
++            children: [
++              Expanded(
++                child: OutlinedButton(
++                  onPressed: () => _pickTime(isStart: true),
++                  child: Text('Start ${_formatTime(_startTime)}'),
++                ),
++              ),
++              const SizedBox(width: 12),
++              Expanded(
++                child: OutlinedButton(
++                  onPressed: () => _pickTime(isStart: false),
++                  child: Text('End ${_formatTime(_endTime)}'),
++                ),
++              ),
++            ],
++          ),
++          const SizedBox(height: 20),
++
++          const Text('Room', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
++          const SizedBox(height: 8),
++          _roomsLoading
++              ? const LinearProgressIndicator()
++              : DropdownButtonFormField<RoomModel>(
++                  value: _selectedRoom,
++                  isExpanded: true,
++                  hint: Text('Keep current room (${widget.session.room})'),
++                  items: _rooms
++                      .map((r) => DropdownMenuItem(value: r, child: Text(r.label)))
++                      .toList(),
++                  onChanged: (r) => setState(() => _selectedRoom = r),
++                  decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
++                ),
++          const SizedBox(height: 20),
++
++          const Text('Reason (optional)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
++          const SizedBox(height: 8),
++          TextField(
++            controller: _reasonController,
++            maxLines: 2,
++            decoration: const InputDecoration(
++              hintText: 'e.g. Lecture hall unavailable',
++              border: OutlineInputBorder(),
++              isDense: true,
++            ),
++          ),
++          const SizedBox(height: 24),
++
++          SizedBox(
++            width: double.infinity,
++            child: FilledButton(
++              onPressed: _submitting ? null : _submit,
++              style: FilledButton.styleFrom(backgroundColor: LecturerColors.navy, padding: const EdgeInsets.symmetric(vertical: 14)),
++              child: _submitting
++                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
++                  : const Text('Reschedule & Notify Students'),
++            ),
++          ),
+         ],
+       ),
+     );
