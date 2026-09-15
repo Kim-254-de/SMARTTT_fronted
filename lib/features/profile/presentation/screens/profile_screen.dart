@@ -197,7 +197,7 @@ class ProfileScreen extends ConsumerWidget {
                   null,
                   () {
                     ref.read(authProvider.notifier).logout();
-                    context.go('/login');
+                    context.go('/');
                   },
                   isDestructive: true,
                 ),

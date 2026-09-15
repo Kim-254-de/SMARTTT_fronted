@@ -1,0 +1,14 @@
+diff --git a/lib/features/schedule/presentation/student_preferences_screen.dart b/lib/features/schedule/presentation/student_preferences_screen.dart
+index d738c50..567ebcc 100644
+--- a/lib/features/schedule/presentation/student_preferences_screen.dart
++++ b/lib/features/schedule/presentation/student_preferences_screen.dart
+@@ -97,8 +97,7 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
+     try {
+       final dio = apiClient.dio;
+       await dio.patch('accounts/profile/', data: {
+-        'course': _selectedCourseName,
+-        'department': 'General',
++        'program_id': _selectedCourseId,
+         'year_of_study': _selectedYear,
+         'combination': _combinationController.text.trim(),
+         'timetable_group': _selectedGroup,

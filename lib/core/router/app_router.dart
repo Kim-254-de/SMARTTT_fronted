@@ -155,7 +155,7 @@ GoRouter createRouter(Ref ref) {
       final isAuthenticated = authState.user != null;
 
       if (!isAuthenticated) {
-        if (!isAuthEntry && !isPublicPolicyPage) return '/login';
+        if (!isAuthEntry && !isPublicPolicyPage) return '/';
         return null;
       }
 

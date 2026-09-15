@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/lecturer_dashboard_provider.dart';
-import '../../domain/models/lecturer_dashboard_model.dart'; // Correct relative path
+import '../../domain/models/lecturer_dashboard_model.dart';
+import '../../../../core/network/api_client.dart';
 import '../widgets/lecturer_colors.dart';
 
 class LecturerNotificationTab extends ConsumerStatefulWidget {
@@ -13,22 +14,82 @@ class LecturerNotificationTab extends ConsumerStatefulWidget {
 
 class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTab> {
   String? selectedUnitId;
-  String notifType = 'general';
+  String notifType = 'general'; // 'general', 'timetable_change', 'reschedule'
+  
   final titleController = TextEditingController();
   final messageController = TextEditingController();
+  final reasonController = TextEditingController();
+
+  // Reschedule specific states
+  String? selectedSlotId;
+  List<Map<String, dynamic>> availableSlotsForUnit = [];
+  bool isLoadingSlots = false;
+
+  String selectedDay = 'mon';
+  TimeOfDay startTime = const TimeOfDay(hour: 8, minute: 0);
+  TimeOfDay endTime = const TimeOfDay(hour: 10, minute: 0);
+  
   bool isSending = false;
   String? alertMessage;
   bool isSuccess = false;
+
+  final List<String> days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+  @override
+  void dispose() {
+    titleController.dispose();
+    messageController.dispose();
+    reasonController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchSlotsForUnit(String unitId) async {
+    setState(() {
+      isLoadingSlots = true;
+      selectedSlotId = null;
+      availableSlotsForUnit = [];
+    });
+
+    try {
+      // Fetch all slots from the endpoint without relying on backend query filters
+      final response = await apiClient.dio.get('timetable/slots/');
+      
+      final dynamic rawData = response.data;
+      final List<Map<String, dynamic>> allSlots = rawData is List
+          ? List<Map<String, dynamic>>.from(rawData)
+          : List<Map<String, dynamic>>.from(rawData['results'] ?? []);
+
+      // Client-side filtering: match slots where the unit ID matches
+      final filteredSlots = allSlots.where((slot) {
+        final slotUnit = slot['unit'];
+        if (slotUnit is Map) {
+          return slotUnit['id'].toString() == unitId;
+        }
+        return slotUnit?.toString() == unitId;
+      }).toList();
+
+      setState(() {
+        availableSlotsForUnit = filteredSlots;
+        isLoadingSlots = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoadingSlots = false;
+        availableSlotsForUnit = [];
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final dashboard = ref.watch(lecturerDashboardProvider).dashboard;
     final units = dashboard?.units ?? [];
+    final isReschedule = notifType == 'reschedule';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(
-        title: const Text('Send Notification', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Lecturer Broadcast & Reschedule', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black87,
@@ -59,6 +120,26 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
                 ),
                 const SizedBox(height: 16),
               ],
+
+              // Action Mode Dropdown
+              const Text('Action Type', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<String>(
+                value: notifType,
+                items: const [
+                  DropdownMenuItem(value: 'general', child: Text('General Broadcast Notification')),
+                  DropdownMenuItem(value: 'timetable_change', child: Text('Timetable Alert Broadcast')),
+                  DropdownMenuItem(value: 'reschedule', child: Text('Reschedule Timetable Slot (Auto-Notify)')),
+                ],
+                onChanged: (val) => setState(() => notifType = val ?? 'general'),
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Unit Selector
               const Text('Select Unit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
@@ -70,56 +151,137 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
                     child: Text('${u.code} — ${u.name}'),
                   );
                 }).toList(),
-                onChanged: (val) => setState(() => selectedUnitId = val),
+                onChanged: (val) {
+                  setState(() => selectedUnitId = val);
+                  if (val != null && isReschedule) {
+                    _fetchSlotsForUnit(val);
+                  }
+                },
                 decoration: InputDecoration(
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Notification Title', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-              const SizedBox(height: 6),
-              TextField(
-                controller: titleController,
-                decoration: InputDecoration(
-                  hintText: 'e.g. Class rescheduled to Friday',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+
+              
+             // Conditional Fields based on Mode
+              if (isReschedule) ...[
+                const Text('Select Class Slot to Reschedule', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const SizedBox(height: 6),
+                isLoadingSlots
+                    ? const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()))
+                    : DropdownButtonFormField<String>(
+                        value: selectedSlotId,
+                        hint: const Text('— Choose a scheduled slot —'),
+                        items: availableSlotsForUnit.map<DropdownMenuItem<String>>((slot) {
+                          final day = slot['day_of_week'] ?? '';
+                          final start = slot['start_time'] ?? '';
+                          final end = slot['end_time'] ?? '';
+                          final room = slot['room_code'] ?? slot['room'] ?? 'TBA';
+                          return DropdownMenuItem<String>(
+                            value: slot['id'].toString(),
+                            child: Text('${day.toUpperCase()} | $start - $end | Room: $room'),
+                          );
+                        }).toList(),
+                        onChanged: (val) => setState(() => selectedSlotId = val),
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('New Day', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                          const SizedBox(height: 6),
+                          DropdownButtonFormField<String>(
+                            value: selectedDay,
+                            items: days.map((d) => DropdownMenuItem(value: d, child: Text(d.toUpperCase()))).toList(),
+                            onChanged: (val) => setState(() => selectedDay = val ?? 'mon'),
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 16),
-              const Text('Message Body', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-              const SizedBox(height: 6),
-              TextField(
-                controller: messageController,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: 'Write your message to students…',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.all(14),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.access_time),
+                        label: Text('Start: ${startTime.format(context)}'),
+                        onPressed: () async {
+                          final picked = await showTimePicker(context: context, initialTime: startTime);
+                          if (picked != null) setState(() => startTime = picked);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.access_time_filled),
+                        label: Text('End: ${endTime.format(context)}'),
+                        onPressed: () async {
+                          final picked = await showTimePicker(context: context, initialTime: endTime);
+                          if (picked != null) setState(() => endTime = picked);
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 16),
-              const Text('Type', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                value: notifType,
-                items: const [
-                  DropdownMenuItem(value: 'general', child: Text('General')),
-                  DropdownMenuItem(value: 'timetable_change', child: Text('Timetable Change')),
-                  DropdownMenuItem(value: 'sync_reminder', child: Text('Sync Reminder')),
-                ],
-                onChanged: (val) => setState(() => notifType = val ?? 'general'),
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                const SizedBox(height: 16),
+                const Text('Reason for Rescheduling', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: reasonController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: 'e.g., Medical appointment / Venue clashes...',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.all(14),
+                  ),
                 ),
-              ),
+              ] else ...[
+                // Standard Notification Fields...
+                const Text('Notification Title', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Class rescheduled to Friday',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('Message Body', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: messageController,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    hintText: 'Write your message to students…',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.all(14),
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: isSending ? null : _sendNotificationAction,
+                  onPressed: isSending ? null : _submitAction,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: LecturerColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -127,7 +289,10 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
                   ),
                   child: isSending
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text('Send to Students', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      : Text(
+                          isReschedule ? 'Submit Reschedule & Notify Students' : 'Send to Students',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
             ],
@@ -137,10 +302,10 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
     );
   }
 
-  Future<void> _sendNotificationAction() async {
-    if (selectedUnitId == null || titleController.text.trim().isEmpty || messageController.text.trim().isEmpty) {
+  Future<void> _submitAction() async {
+    if (selectedUnitId == null) {
       setState(() {
-        alertMessage = 'Please fill out all fields and select a unit.';
+        alertMessage = 'Please select a unit.';
         isSuccess = false;
       });
       return;
@@ -152,20 +317,48 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
     });
 
     try {
-      final repo = ref.read(lecturerRepositoryProvider);
-      final res = await repo.sendNotification(
-        unitId: selectedUnitId!,
-        notificationType: notifType,
-        title: titleController.text.trim(),
-        message: messageController.text.trim(),
-      );
+      if (notifType == 'reschedule') {
+        if (selectedSlotId == null) {
+          throw Exception('Please select a timetable slot to reschedule.');
+        }
 
-      setState(() {
-        isSuccess = true;
-        alertMessage = '✓ Successfully sent to ${res['recipients'] ?? 0} student(s).';
-        titleController.clear();
-        messageController.clear();
-      });
+        final response = await apiClient.dio.post(
+          'timetable/slots/$selectedSlotId/reschedule/',
+          data: {
+            'day_of_week': selectedDay,
+            'start_time': '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}:00',
+            'end_time': '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}:00',
+            'reason': reasonController.text.trim(),
+          },
+        );
+
+        final notifiedData = response.data['notified'] ?? {};
+        setState(() {
+          isSuccess = true;
+          alertMessage = '✓ Class rescheduled successfully! Notified ${notifiedData['recipients'] ?? 0} students via push & alert.';
+          selectedSlotId = null;
+          reasonController.clear();
+        });
+      } else {
+        if (titleController.text.trim().isEmpty || messageController.text.trim().isEmpty) {
+          throw Exception('Please fill out both title and message fields.');
+        }
+
+        final repo = ref.read(lecturerRepositoryProvider);
+        final res = await repo.sendNotification(
+          unitId: selectedUnitId!,
+          notificationType: notifType,
+          title: titleController.text.trim(),
+          message: messageController.text.trim(),
+        );
+
+        setState(() {
+          isSuccess = true;
+          alertMessage = '✓ Successfully sent to ${res['recipients'] ?? 0} student(s).';
+          titleController.clear();
+          messageController.clear();
+        });
+      }
     } catch (e) {
       setState(() {
         isSuccess = false;

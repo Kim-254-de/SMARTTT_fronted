@@ -124,8 +124,8 @@ class LecturerProfileTab extends ConsumerWidget {
               await ref.read(authProvider.notifier).logout();
               
               if (context.mounted) {
-                // Redirect user back to login screen
-                context.go('/login');
+                // Redirect user back to the root role selection screen
+                context.go('/'); //
               }
             },
           ),
