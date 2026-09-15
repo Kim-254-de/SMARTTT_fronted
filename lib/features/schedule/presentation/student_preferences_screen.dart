@@ -25,11 +25,21 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
   List<String> _groups = ['MAIN'];
 
   // Selected values
+  // NOTE: _selectedCourseId is a *canonical group key* (see
+  // apps.programs.utils.canonical_program_key on the backend), not a raw
+  // Program row id — the same-looking program can be split across several
+  // duplicated Program rows (e.g. one covering years 1-2, another 3-4), and
+  // the backend groups them so this dropdown shows one entry with the full
+  // union of years instead of the program appearing twice with partial years.
   String? _selectedCourseId;
   String? _selectedCourseName;
   int _selectedYear = 1;
   int _selectedSemester = 1;
   String _selectedGroup = 'MAIN';
+  // The concrete Program row id to actually save, resolved by the backend
+  // for the current course+year combination. Null until the backend has had
+  // a chance to resolve it (which happens as soon as a course is selected).
+  String? _resolvedProgramId;
   final _combinationController = TextEditingController();
 
   @override
@@ -69,9 +79,18 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
           if (_groups.isNotEmpty && !_groups.contains(_selectedGroup)) {
             _selectedGroup = _groups[0];
           }
+
+          _resolvedProgramId = response.data['resolved_program_id'] as String?;
           
           _isLoadingMetadata = false;
         });
+
+        // First load: we now have a default course+year selected, but the
+        // call above didn't scope by them, so resolved_program_id wasn't
+        // returned yet. Re-fetch scoped to the defaults to resolve it.
+        if (programId == null && yearOfStudy == null && _selectedCourseId != null) {
+          await _fetchMetadata(programId: _selectedCourseId, yearOfStudy: _selectedYear);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -98,6 +117,15 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
       final dio = apiClient.dio;
       // Change 'accounts/profile/' to 'auth/profile/'
       await dio.patch('auth/profile/', data: {
+        // Prefer linking the real, already-parsed Program row the backend
+        // resolved for this course+year — this is what the master timetable
+        // (and therefore the student's personalised schedule) is actually
+        // keyed on. 'course'/'department' are sent only as a fallback for
+        // the rare case resolution failed (e.g. a term with no slots yet);
+        // saving those directly would otherwise create a brand-new,
+        // disconnected Program record under a generic department instead of
+        // reusing the one the timetable upload already created.
+        if (_resolvedProgramId != null) 'program_id': _resolvedProgramId,
         'course': _selectedCourseName,
         'department': 'General',
         'year_of_study': _selectedYear,
