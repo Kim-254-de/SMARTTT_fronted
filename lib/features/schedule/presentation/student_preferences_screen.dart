@@ -84,12 +84,10 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
           }
           
           _streams = List<String>.from(response.data['streams'] ?? []);
-          if (_streams.isNotEmpty) {
-            if (_selectedStream == null || !_streams.contains(_selectedStream)) {
-              _selectedStream = _streams[0];
-            }
-          } else {
+          if (_streams.isEmpty) {
             _selectedStream = null;
+          } else if (_selectedStream == null || !_streams.contains(_selectedStream)) {
+            _selectedStream = _streams[0];
           }
 
           _resolvedProgramId = response.data['resolved_program_id'] as String?;
@@ -268,11 +266,19 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
                         ),
                       ],
                     ),
-                    // Only shown when this course+year actually has more than
-                    // one physical class to disambiguate between.
+                    // Stream picker — only shown when this course+year is
+                    // actually split into multiple parallel classes on the
+                    // master timetable (e.g. BED.MATH/CHEM Y3S1 has streams
+                    // "1" and "2"). Most courses have just one class, so
+                    // there's nothing to disambiguate and the picker is
+                    // skipped entirely rather than showing a single option.
                     if (_streams.isNotEmpty) ...[
                       const SizedBox(height: 20),
-                      const Text('Timetable Stream', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      const Text('Class / Stream', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      const Text(
+                        'Your course has more than one class this year — pick yours from the timetable.',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
                         value: _selectedStream,
@@ -282,9 +288,11 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
                           fillColor: AppTheme.getSurface(context),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                         ),
-                        items: _streams.map((s) => DropdownMenuItem(value: s, child: Text('Stream $s'))).toList(),
+                        items: _streams
+                            .map((s) => DropdownMenuItem(value: s, child: Text('Stream $s')))
+                            .toList(),
                         onChanged: (val) => setState(() => _selectedStream = val),
-                        validator: (val) => val == null ? 'Please select your stream' : null,
+                        validator: (val) => val == null ? 'Please select your class/stream' : null,
                       ),
                     ],
                     const SizedBox(height: 36),
