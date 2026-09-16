@@ -98,12 +98,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               PremiumButton(
                 text: 'Save Changes',
                 onPressed: () async {
+                  // Send null (not '') for untouched/blank fields so the
+                  // backend's partial-update ("if key in data: overwrite")
+                  // logic leaves the existing value alone instead of wiping
+                  // it — a TextEditingController's .text is never actually
+                  // null in Dart, even when the field was never filled in.
+                  String? orNull(String text) =>
+                      text.trim().isEmpty ? null : text.trim();
+
                   await ref.read(authProvider.notifier).updateProfile(
                         fullName: _nameController.text,
-                        phoneNumber: _phoneController.text,
-                        admissionNumber: _admissionController.text,
-                        course: _courseController.text,
-                        department: _departmentController.text,
+                        phoneNumber: orNull(_phoneController.text),
+                        admissionNumber: orNull(_admissionController.text),
+                        course: orNull(_courseController.text),
+                        department: orNull(_departmentController.text),
                         yearOfStudy: int.tryParse(_yearController.text),
                       );
                   if (mounted && ref.read(authProvider).error == null) {
