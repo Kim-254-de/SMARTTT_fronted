@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../domain/models/timetable_session_model.dart';
 import 'providers/timetable_provider.dart';
@@ -36,17 +37,26 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   }
 
   // iCalendar
-
- Future<void> subscribeCalendar() async {
-  final uri = Uri.parse(
-    'https://api.nextup.co.ke/api/v1/schedule/calendar.ics',
-  );
-
-  await launchUrl(
-    uri,
-    mode: LaunchMode.externalApplication,
-  );
-}
+  //
+  // calendar.ics can't take our normal JWT header (calendar apps poll it
+  // directly, with no Authorization header) - it authenticates via a signed
+  // token in the query string instead, minted by calendar-token/. Launching
+  // the bare .ics URL without one always got "Missing token" from the
+  // backend; feed_url below is the backend's own absolute URL with that
+  // token already attached, so this also stays correct across environments
+  // instead of a hardcoded production host.
+  Future<void> subscribeCalendar() async {
+    try {
+      final response = await apiClient.dio.get('schedule/calendar-token/');
+      final feedUrl = response.data['feed_url'] as String;
+      await launchUrl(Uri.parse(feedUrl), mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open calendar subscription: $e'), backgroundColor: AppTheme.error),
+      );
+    }
+  }
 
 
   @override
