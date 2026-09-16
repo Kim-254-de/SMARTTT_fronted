@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/lecturer_dashboard_provider.dart';
 import '../../domain/models/lecturer_dashboard_model.dart';
+import '../../data/lecturer_repository.dart';
 import '../../../../core/network/api_client.dart';
 import '../widgets/lecturer_colors.dart';
 
@@ -14,8 +15,8 @@ class LecturerNotificationTab extends ConsumerStatefulWidget {
 
 class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTab> {
   String? selectedUnitId;
-  String notifType = 'general'; // 'general', 'timetable_change', 'reschedule'
-  
+  String notifType = 'general'; // 'general', 'timetable_change', 'venue_change', 'reschedule'
+
   final titleController = TextEditingController();
   final messageController = TextEditingController();
   final reasonController = TextEditingController();
@@ -28,19 +29,40 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
   String selectedDay = 'mon';
   TimeOfDay startTime = const TimeOfDay(hour: 8, minute: 0);
   TimeOfDay endTime = const TimeOfDay(hour: 10, minute: 0);
-  
+
+  // Venue-change specific states
+  String? selectedVenueId;
+  List<RoomModel> rooms = [];
+  bool isLoadingRooms = false;
+  final expectedStudentsController = TextEditingController();
+
   bool isSending = false;
   String? alertMessage;
   bool isSuccess = false;
 
-  final List<String> days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  // Backend TimetableSlot.WeekDay only defines Mon–Sat.
+  final List<String> days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
   @override
   void dispose() {
     titleController.dispose();
     messageController.dispose();
     reasonController.dispose();
+    expectedStudentsController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchRooms() async {
+    setState(() => isLoadingRooms = true);
+    try {
+      final result = await ref.read(lecturerRepositoryProvider).fetchRooms();
+      setState(() {
+        rooms = result;
+        isLoadingRooms = false;
+      });
+    } catch (e) {
+      setState(() => isLoadingRooms = false);
+    }
   }
 
   Future<void> _fetchSlotsForUnit(String unitId) async {
@@ -51,25 +73,21 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
     });
 
     try {
-      // Fetch all slots from the endpoint without relying on backend query filters
-      final response = await apiClient.dio.get('timetable/slots/');
-      
+      // Server-side filtered by unit, so this only ever returns slots for
+      // the selected unit rather than relying on scanning a fixed page of
+      // the full (thousands-of-rows) slot list client-side.
+      final response = await apiClient.dio.get(
+        'timetable/slots/',
+        queryParameters: {'unit': unitId, 'page_size': 200},
+      );
+
       final dynamic rawData = response.data;
-      final List<Map<String, dynamic>> allSlots = rawData is List
+      final List<Map<String, dynamic>> slots = rawData is List
           ? List<Map<String, dynamic>>.from(rawData)
           : List<Map<String, dynamic>>.from(rawData['results'] ?? []);
 
-      // Client-side filtering: match slots where the unit ID matches
-      final filteredSlots = allSlots.where((slot) {
-        final slotUnit = slot['unit'];
-        if (slotUnit is Map) {
-          return slotUnit['id'].toString() == unitId;
-        }
-        return slotUnit?.toString() == unitId;
-      }).toList();
-
       setState(() {
-        availableSlotsForUnit = filteredSlots;
+        availableSlotsForUnit = slots;
         isLoadingSlots = false;
       });
     } catch (e) {
@@ -129,9 +147,15 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
                 items: const [
                   DropdownMenuItem(value: 'general', child: Text('General Broadcast Notification')),
                   DropdownMenuItem(value: 'timetable_change', child: Text('Timetable Alert Broadcast')),
+                  DropdownMenuItem(value: 'venue_change', child: Text('Venue Change Notification')),
                   DropdownMenuItem(value: 'reschedule', child: Text('Reschedule Timetable Slot (Auto-Notify)')),
                 ],
-                onChanged: (val) => setState(() => notifType = val ?? 'general'),
+                onChanged: (val) {
+                  setState(() => notifType = val ?? 'general');
+                  if (val == 'venue_change' && rooms.isEmpty && !isLoadingRooms) {
+                    _fetchRooms();
+                  }
+                },
                 decoration: InputDecoration(
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -178,7 +202,7 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
                           final day = slot['day_of_week'] ?? '';
                           final start = slot['start_time'] ?? '';
                           final end = slot['end_time'] ?? '';
-                          final room = slot['room_code'] ?? slot['room'] ?? 'TBA';
+                          final room = slot['location'] ?? slot['room_display'] ?? 'TBA';
                           return DropdownMenuItem<String>(
                             value: slot['id'].toString(),
                             child: Text('${day.toUpperCase()} | $start - $end | Room: $room'),
@@ -275,6 +299,37 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
                     contentPadding: const EdgeInsets.all(14),
                   ),
                 ),
+                if (notifType == 'venue_change') ...[
+                  const SizedBox(height: 16),
+                  const Text('New Venue', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  const SizedBox(height: 6),
+                  isLoadingRooms
+                      ? const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()))
+                      : DropdownButtonFormField<String>(
+                          value: selectedVenueId,
+                          hint: const Text('— Select a room —'),
+                          items: rooms.map<DropdownMenuItem<String>>((RoomModel r) {
+                            return DropdownMenuItem<String>(value: r.id, child: Text(r.label));
+                          }).toList(),
+                          onChanged: (val) => setState(() => selectedVenueId = val),
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          ),
+                        ),
+                  const SizedBox(height: 16),
+                  const Text('Expected Number of Students', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: expectedStudentsController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: 'e.g. 45',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                ],
               ],
 
               const SizedBox(height: 24),
@@ -344,12 +399,27 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
           throw Exception('Please fill out both title and message fields.');
         }
 
+        String? newVenueId;
+        int? expectedStudents;
+        if (notifType == 'venue_change') {
+          if (selectedVenueId == null) {
+            throw Exception('Please select the new venue.');
+          }
+          expectedStudents = int.tryParse(expectedStudentsController.text.trim());
+          if (expectedStudents == null || expectedStudents <= 0) {
+            throw Exception('Please enter a valid expected number of students.');
+          }
+          newVenueId = selectedVenueId;
+        }
+
         final repo = ref.read(lecturerRepositoryProvider);
         final res = await repo.sendNotification(
           unitId: selectedUnitId!,
           notificationType: notifType,
           title: titleController.text.trim(),
           message: messageController.text.trim(),
+          newVenueId: newVenueId,
+          expectedStudents: expectedStudents,
         );
 
         setState(() {
@@ -357,8 +427,20 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
           alertMessage = '✓ Successfully sent to ${res['recipients'] ?? 0} student(s).';
           titleController.clear();
           messageController.clear();
+          selectedVenueId = null;
+          expectedStudentsController.clear();
         });
       }
+    } on VenueCapacityException catch (e) {
+      final alternatives = e.suggestedRooms
+          .map((r) => '${r['code']} (capacity ${r['capacity']})')
+          .join(', ');
+      setState(() {
+        isSuccess = false;
+        alertMessage = alternatives.isEmpty
+            ? e.message
+            : '${e.message} Try: $alternatives.';
+      });
     } catch (e) {
       setState(() {
         isSuccess = false;
