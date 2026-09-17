@@ -6,8 +6,13 @@ import '../../../../core/theme/app_theme.dart';
 class SupportScreen extends StatelessWidget {
   const SupportScreen({super.key});
 
-  static const String supportEmail = 'support@tharaka.ac.ke';
-  static const String supportPhone = '+254712345678';
+  static const String supportEmail = 'support@nextup.co.ke';
+  static const List<String> supportPhones = [
+    '+254741179808',
+    '+254715238416',
+    '+254110725771',
+    '+254115332870',
+  ];
   static const String universityName = 'Tharaka University';
   static const String universityWebsite = 'https://tharaka.ac.ke';
 
@@ -27,8 +32,8 @@ class SupportScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _launchPhone() async {
-    final Uri phoneUri = Uri(scheme: 'tel', path: supportPhone);
+  Future<void> _launchPhone(String phoneNumber) async {
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
     try {
       await launchUrl(phoneUri);
     } catch (e) {
@@ -139,14 +144,17 @@ class SupportScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            _ContactTile(
-              icon: Iconsax.call,
-              label: 'Phone Support',
-              value: supportPhone,
-              description: 'Call us during business hours',
-              onTap: _launchPhone,
-            ),
-            const SizedBox(height: 32),
+            for (int i = 0; i < supportPhones.length; i++) ...[
+              _ContactTile(
+                icon: Iconsax.call,
+                label: supportPhones.length > 1 ? 'Phone Support ${i + 1}' : 'Phone Support',
+                value: supportPhones[i],
+                description: 'Call us during business hours',
+                onTap: () => _launchPhone(supportPhones[i]),
+              ),
+              const SizedBox(height: 12),
+            ],
+            const SizedBox(height: 20),
 
             // Additional Resources
             Text(

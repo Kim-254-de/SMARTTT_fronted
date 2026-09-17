@@ -99,28 +99,62 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
     }
   }
 
+  TextStyle _labelStyle(bool isDarkMode) => TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
+        color: isDarkMode ? Colors.grey[400] : Colors.grey,
+      );
+
+  TextStyle _fieldTextStyle(bool isDarkMode) => TextStyle(
+        color: isDarkMode ? Colors.white : Colors.black87,
+      );
+
+  InputDecoration _fieldDecoration(bool isDarkMode, {String? hintText}) {
+    final borderColor = isDarkMode ? Colors.grey[800]! : const Color(0xFFE2E8F0);
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: TextStyle(color: isDarkMode ? Colors.grey[600] : Colors.grey[400]),
+      filled: true,
+      fillColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: borderColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: borderColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: LecturerColors.primary),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dashboard = ref.watch(lecturerDashboardProvider).dashboard;
     final units = dashboard?.units ?? [];
     final isReschedule = notifType == 'reschedule';
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
+      backgroundColor: isDarkMode ? const Color(0xFF121212) : const Color(0xFFF7F8FA),
       appBar: AppBar(
         title: const Text('Lecturer Broadcast & Reschedule', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
+        backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
         elevation: 0,
-        foregroundColor: Colors.black87,
+        foregroundColor: isDarkMode ? Colors.white : Colors.black87,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: isDarkMode ? Colors.grey[800]! : const Color(0xFFE2E8F0)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,22 +163,31 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: isSuccess ? Colors.green[50] : Colors.red[50],
+                    color: isSuccess
+                        ? (isDarkMode ? Colors.green.withValues(alpha: 0.15) : Colors.green[50])
+                        : (isDarkMode ? Colors.red.withValues(alpha: 0.15) : Colors.red[50]),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     alertMessage!,
-                    style: TextStyle(color: isSuccess ? Colors.green[800] : Colors.red[800], fontSize: 13),
+                    style: TextStyle(
+                      color: isSuccess
+                          ? (isDarkMode ? Colors.green[300] : Colors.green[800])
+                          : (isDarkMode ? Colors.red[300] : Colors.red[800]),
+                      fontSize: 13,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
               ],
 
               // Action Mode Dropdown
-              const Text('Action Type', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+              Text('Action Type', style: _labelStyle(isDarkMode)),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
                 value: notifType,
+                style: _fieldTextStyle(isDarkMode),
+                dropdownColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
                 items: const [
                   DropdownMenuItem(value: 'general', child: Text('General Broadcast Notification')),
                   DropdownMenuItem(value: 'timetable_change', child: Text('Timetable Alert Broadcast')),
@@ -157,19 +200,18 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
                     _fetchRooms();
                   }
                 },
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
+                decoration: _fieldDecoration(isDarkMode),
               ),
               const SizedBox(height: 16),
 
               // Unit Selector
-              const Text('Select Unit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+              Text('Select Unit', style: _labelStyle(isDarkMode)),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
                 value: selectedUnitId,
-                hint: const Text('— Select unit —'),
+                style: _fieldTextStyle(isDarkMode),
+                dropdownColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+                hint: Text('— Select unit —', style: TextStyle(color: isDarkMode ? Colors.grey[600] : Colors.grey[400])),
                 items: units.map<DropdownMenuItem<String>>((LecturerUnitModel u) {
                   return DropdownMenuItem<String>(
                     value: u.id,
@@ -182,38 +224,41 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
                     _fetchSlotsForUnit(val);
                   }
                 },
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
+                decoration: _fieldDecoration(isDarkMode),
               ),
               const SizedBox(height: 16),
 
-              
+
              // Conditional Fields based on Mode
               if (isReschedule) ...[
-                const Text('Select Class Slot to Reschedule', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                Text('Select Class Slot to Reschedule', style: _labelStyle(isDarkMode)),
                 const SizedBox(height: 6),
                 isLoadingSlots
                     ? const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()))
                     : DropdownButtonFormField<String>(
                         value: selectedSlotId,
-                        hint: const Text('— Choose a scheduled slot —'),
+                        style: _fieldTextStyle(isDarkMode),
+                        dropdownColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+                        hint: Text('— Choose a scheduled slot —', style: TextStyle(color: isDarkMode ? Colors.grey[600] : Colors.grey[400])),
                         items: availableSlotsForUnit.map<DropdownMenuItem<String>>((slot) {
                           final day = slot['day_of_week'] ?? '';
                           final start = slot['start_time'] ?? '';
                           final end = slot['end_time'] ?? '';
                           final room = slot['location'] ?? slot['room_display'] ?? 'TBA';
+                          final unitCode = slot['unit_code'] ?? '';
+                          final classGroup = (slot['class_group'] ?? '').toString();
+                          final groupLabel = classGroup.isNotEmpty && classGroup.toUpperCase() != 'MAIN'
+                              ? ' ($classGroup)'
+                              : '';
                           return DropdownMenuItem<String>(
                             value: slot['id'].toString(),
-                            child: Text('${day.toUpperCase()} | $start - $end | Room: $room'),
+                            child: Text(
+                              '$unitCode$groupLabel | ${day.toUpperCase()} | $start - $end | Room: $room',
+                            ),
                           );
                         }).toList(),
                         onChanged: (val) => setState(() => selectedSlotId = val),
-                        decoration: InputDecoration(
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        ),
+                        decoration: _fieldDecoration(isDarkMode),
                       ),
                 const SizedBox(height: 16),
                 Row(
@@ -222,16 +267,15 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('New Day', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                          Text('New Day', style: _labelStyle(isDarkMode)),
                           const SizedBox(height: 6),
                           DropdownButtonFormField<String>(
                             value: selectedDay,
+                            style: _fieldTextStyle(isDarkMode),
+                            dropdownColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
                             items: days.map((d) => DropdownMenuItem(value: d, child: Text(d.toUpperCase()))).toList(),
                             onChanged: (val) => setState(() => selectedDay = val ?? 'mon'),
-                            decoration: InputDecoration(
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            ),
+                            decoration: _fieldDecoration(isDarkMode),
                           ),
                         ],
                       ),
@@ -243,8 +287,11 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.access_time),
-                        label: Text('Start: ${startTime.format(context)}'),
+                        icon: Icon(Icons.access_time, color: isDarkMode ? Colors.white : Colors.black87),
+                        label: Text('Start: ${startTime.format(context)}', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87)),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[400]!),
+                        ),
                         onPressed: () async {
                           final picked = await showTimePicker(context: context, initialTime: startTime);
                           if (picked != null) setState(() => startTime = picked);
@@ -254,8 +301,11 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.access_time_filled),
-                        label: Text('End: ${endTime.format(context)}'),
+                        icon: Icon(Icons.access_time_filled, color: isDarkMode ? Colors.white : Colors.black87),
+                        label: Text('End: ${endTime.format(context)}', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87)),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[400]!),
+                        ),
                         onPressed: () async {
                           final picked = await showTimePicker(context: context, initialTime: endTime);
                           if (picked != null) setState(() => endTime = picked);
@@ -265,70 +315,57 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
                   ],
                 ),
                 const SizedBox(height: 16),
-                const Text('Reason for Rescheduling', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                Text('Reason for Rescheduling', style: _labelStyle(isDarkMode)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: reasonController,
                   maxLines: 2,
-                  decoration: InputDecoration(
-                    hintText: 'e.g., Medical appointment / Venue clashes...',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    contentPadding: const EdgeInsets.all(14),
-                  ),
+                  style: _fieldTextStyle(isDarkMode),
+                  decoration: _fieldDecoration(isDarkMode, hintText: 'e.g., Medical appointment / Venue clashes...'),
                 ),
               ] else ...[
                 // Standard Notification Fields...
-                const Text('Notification Title', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                Text('Notification Title', style: _labelStyle(isDarkMode)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: titleController,
-                  decoration: InputDecoration(
-                    hintText: 'e.g. Class rescheduled to Friday',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  ),
+                  style: _fieldTextStyle(isDarkMode),
+                  decoration: _fieldDecoration(isDarkMode, hintText: 'e.g. Class rescheduled to Friday'),
                 ),
                 const SizedBox(height: 16),
-                const Text('Message Body', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                Text('Message Body', style: _labelStyle(isDarkMode)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: messageController,
                   maxLines: 4,
-                  decoration: InputDecoration(
-                    hintText: 'Write your message to students…',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    contentPadding: const EdgeInsets.all(14),
-                  ),
+                  style: _fieldTextStyle(isDarkMode),
+                  decoration: _fieldDecoration(isDarkMode, hintText: 'Write your message to students…'),
                 ),
                 if (notifType == 'venue_change') ...[
                   const SizedBox(height: 16),
-                  const Text('New Venue', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  Text('New Venue', style: _labelStyle(isDarkMode)),
                   const SizedBox(height: 6),
                   isLoadingRooms
                       ? const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()))
                       : DropdownButtonFormField<String>(
                           value: selectedVenueId,
-                          hint: const Text('— Select a room —'),
+                          style: _fieldTextStyle(isDarkMode),
+                          dropdownColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
+                          hint: Text('— Select a room —', style: TextStyle(color: isDarkMode ? Colors.grey[600] : Colors.grey[400])),
                           items: rooms.map<DropdownMenuItem<String>>((RoomModel r) {
                             return DropdownMenuItem<String>(value: r.id, child: Text(r.label));
                           }).toList(),
                           onChanged: (val) => setState(() => selectedVenueId = val),
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          ),
+                          decoration: _fieldDecoration(isDarkMode),
                         ),
                   const SizedBox(height: 16),
-                  const Text('Expected Number of Students', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  Text('Expected Number of Students', style: _labelStyle(isDarkMode)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: expectedStudentsController,
                     keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      hintText: 'e.g. 45',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
+                    style: _fieldTextStyle(isDarkMode),
+                    decoration: _fieldDecoration(isDarkMode, hintText: 'e.g. 45'),
                   ),
                 ],
               ],
