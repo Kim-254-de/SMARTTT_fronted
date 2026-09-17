@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../domain/models/timetable_session_model.dart';
 import 'providers/timetable_provider.dart';
@@ -36,17 +37,26 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   }
 
   // iCalendar
-
- Future<void> subscribeCalendar() async {
-  final uri = Uri.parse(
-    'https://api.nextup.co.ke/api/v1/schedule/calendar.ics',
-  );
-
-  await launchUrl(
-    uri,
-    mode: LaunchMode.externalApplication,
-  );
-}
+  //
+  // calendar.ics can't take our normal JWT header (calendar apps poll it
+  // directly, with no Authorization header) - it authenticates via a signed
+  // token in the query string instead, minted by calendar-token/. Launching
+  // the bare .ics URL without one always got "Missing token" from the
+  // backend; feed_url below is the backend's own absolute URL with that
+  // token already attached, so this also stays correct across environments
+  // instead of a hardcoded production host.
+  Future<void> subscribeCalendar() async {
+    try {
+      final response = await apiClient.dio.get('schedule/calendar-token/');
+      final feedUrl = response.data['feed_url'] as String;
+      await launchUrl(Uri.parse(feedUrl), mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open calendar subscription: $e'), backgroundColor: AppTheme.error),
+      );
+    }
+  }
 
 
   @override
@@ -61,6 +71,13 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         automaticallyImplyLeading: false,
         title: const Text('Class Schedule'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.groups_outlined),
+            tooltip: 'Your Class Groups',
+            onPressed: () => context.push('/select-groups'),
+          ),
+        ],
        ),
       body: RefreshIndicator(
         onRefresh: () => ref.read(timetableProvider.notifier).fetchMySchedule(),
@@ -87,6 +104,10 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
             ),
 
             const SizedBox(height: 16),
+            if (state.unitsNeedingGroupSelection.isNotEmpty) ...[
+              _GroupSelectionBanner(count: state.unitsNeedingGroupSelection.length),
+              const SizedBox(height: 12),
+            ],
             if (state.isFromCache) ...[
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -215,6 +236,47 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     final daySessions = sessions.where((s) => s.dayOfWeek.toUpperCase() == keyName).toList();
     daySessions.sort((a, b) => a.startTime.compareTo(b.startTime));
     return daySessions;
+  }
+}
+
+class _GroupSelectionBanner extends StatelessWidget {
+  const _GroupSelectionBanner({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => context.push('/select-groups'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.groups_outlined, size: 20, color: AppTheme.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                count == 1
+                    ? '1 unit needs your class group — tap to pick it'
+                    : '$count units need your class group — tap to pick them',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.getTextPrimary(context),
+                ),
+              ),
+            ),
+            Icon(Icons.chevron_right, color: AppTheme.primary),
+          ],
+        ),
+      ),
+    );
   }
 }
 

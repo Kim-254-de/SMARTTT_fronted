@@ -22,7 +22,11 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
   // Dropdown options loaded from API
   List<Map<String, dynamic>> _courses = [];
   List<int> _years = [1, 2, 3, 4];
-  List<String> _groups = ['MAIN'];
+  // The distinct sub-streams for the selected course+year (e.g. the "1"/"2"
+  // in "BED.MATH/CHEM Y3S1(1)"/"(2)") - see TimetableSlot.stream on the
+  // backend. Empty means this course+year isn't split, so there's nothing
+  // to disambiguate and the picker should stay hidden.
+  List<String> _streams = [];
 
   // Selected values
   // NOTE: _selectedCourseId is a *canonical group key* (see
@@ -35,7 +39,11 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
   String? _selectedCourseName;
   int _selectedYear = 1;
   int _selectedSemester = 1;
-  String _selectedGroup = 'MAIN';
+  // Null when the course+year has no streams to pick between - saved as an
+  // empty timetable_group so the backend schedule query treats every slot
+  // for that unit as the student's own, instead of filtering by a stream
+  // value ("MAIN") that no real TimetableSlot ever carries.
+  String? _selectedStream;
   // The concrete Program row id to actually save, resolved by the backend
   // for the current course+year combination. Null until the backend has had
   // a chance to resolve it (which happens as soon as a course is selected).
@@ -75,9 +83,11 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
             _selectedYear = _years[0];
           }
           
-          _groups = List<String>.from(response.data['groups'] ?? ['MAIN']);
-          if (_groups.isNotEmpty && !_groups.contains(_selectedGroup)) {
-            _selectedGroup = _groups[0];
+          _streams = List<String>.from(response.data['streams'] ?? []);
+          if (_streams.isEmpty) {
+            _selectedStream = null;
+          } else if (_selectedStream == null || !_streams.contains(_selectedStream)) {
+            _selectedStream = _streams[0];
           }
 
           _resolvedProgramId = response.data['resolved_program_id'] as String?;
@@ -130,7 +140,7 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
         'department': 'General',
         'year_of_study': _selectedYear,
         'combination': _combinationController.text.trim(),
-        'timetable_group': _selectedGroup,
+        'timetable_group': _selectedStream ?? '',
       });
 
       if (!mounted) return;
@@ -256,22 +266,35 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-
-                    // Timetable Group / Stream Dropdown
-                    const Text('Timetable Group / Stream', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedGroup,
-                      dropdownColor: AppTheme.getSurface(context),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: AppTheme.getSurface(context),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    // Stream picker — only shown when this course+year is
+                    // actually split into multiple parallel classes on the
+                    // master timetable (e.g. BED.MATH/CHEM Y3S1 has streams
+                    // "1" and "2"). Most courses have just one class, so
+                    // there's nothing to disambiguate and the picker is
+                    // skipped entirely rather than showing a single option.
+                    if (_streams.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      const Text('Class / Stream', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      const Text(
+                        'Your course has more than one class this year — pick yours from the timetable.',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
                       ),
-                      items: _groups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-                      onChanged: (val) => setState(() => _selectedGroup = val ?? 'MAIN'),
-                    ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: _selectedStream,
+                        dropdownColor: AppTheme.getSurface(context),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: AppTheme.getSurface(context),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        ),
+                        items: _streams
+                            .map((s) => DropdownMenuItem(value: s, child: Text('Stream $s')))
+                            .toList(),
+                        onChanged: (val) => setState(() => _selectedStream = val),
+                        validator: (val) => val == null ? 'Please select your class/stream' : null,
+                      ),
+                    ],
                     const SizedBox(height: 36),
 
                     // Submit Button
