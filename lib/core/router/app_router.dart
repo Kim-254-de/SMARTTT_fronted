@@ -89,11 +89,6 @@ GoRouter createRouter(Ref ref) {
         builder: (context, state) => const HomeScreen(),
       ),
       GoRoute(
-        path: '/role-select',
-        name: 'role-select',
-        builder: (context, state) => const RoleSelectScreen(),
-      ),
-      GoRoute(
         path: '/lecturer/home',
         name: 'lecturer-home',
         builder: (context, state) => const LecturerShellScreen(),

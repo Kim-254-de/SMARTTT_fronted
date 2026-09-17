@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/lecturer_dashboard_provider.dart';
@@ -440,6 +441,21 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
         alertMessage = alternatives.isEmpty
             ? e.message
             : '${e.message} Try: $alternatives.';
+      });
+    } on DioException catch (e) {
+      // Surface the backend's own message (e.g. a 409 room/lecturer clash
+      // from the reschedule endpoint) instead of dumping the raw exception.
+      final data = e.response?.data;
+      String message;
+      if (data is Map && data['detail'] != null) {
+        final detail = data['detail'];
+        message = detail is List && detail.isNotEmpty ? detail.first.toString() : detail.toString();
+      } else {
+        message = e.message ?? 'Request failed. Please try again.';
+      }
+      setState(() {
+        isSuccess = false;
+        alertMessage = message;
       });
     } catch (e) {
       setState(() {
