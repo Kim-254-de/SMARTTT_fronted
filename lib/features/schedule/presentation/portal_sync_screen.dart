@@ -50,7 +50,14 @@ class _PortalSyncScreenState extends ConsumerState<PortalSyncScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Units synced successfully!')),
       );
-      context.pop();
+      // fetchMySchedule() (called inside syncFromPortal) also refreshes
+      // registeredUnits, so this reflects units that just got synced.
+      final pending = ref.read(timetableProvider).unitsNeedingGroupSelection;
+      if (pending.isNotEmpty) {
+        context.pushReplacement('/select-groups');
+      } else {
+        context.pop();
+      }
     } else {
       final error = ref.read(timetableProvider).error;
       ScaffoldMessenger.of(context).showSnackBar(

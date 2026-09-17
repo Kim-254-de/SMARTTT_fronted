@@ -3,6 +3,7 @@ import 'dart:developer' as dev;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
 import '../domain/models/academic_term_model.dart';
+import '../domain/models/registered_unit_model.dart';
 import '../domain/models/timetable_session_model.dart';
 
 const List<String> _dayKeys = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -157,17 +158,41 @@ class TimetableRepository {
     }
   }
 
-  /// GET /courses/my-courses/ — list of the student's currently synced units.
-  Future<List<Map<String, dynamic>>> fetchMyCourses() async {
+  /// GET /courses/my-courses/ — the student's currently synced units, each
+  /// with its available elective/practical groups (if the unit is split)
+  /// and whichever one the student has already picked, if any.
+  Future<List<RegisteredUnitModel>> fetchMyCourses() async {
     try {
       final response = await apiClient.dio.get('courses/my-courses/');
       final dynamic data = response.data;
       final List<dynamic> results = data is Map && data['results'] is List
           ? data['results'] as List
           : (data is List ? data : []);
-      return results.cast<Map<String, dynamic>>();
+      return results
+          .map((json) => RegisteredUnitModel.fromJson(json as Map<String, dynamic>))
+          .toList();
     } catch (e, stack) {
       dev.log('Error fetching my courses', error: e, stackTrace: stack, name: 'TimetableRepository');
+      rethrow;
+    }
+  }
+
+  /// PATCH /courses/my-courses/{id}/group/ — records which elective/practical
+  /// group the student is in for one specific registered unit. Different
+  /// unit pools within the same stream can use unrelated group letters at
+  /// once, so this is set per-unit rather than once for the whole stream.
+  Future<RegisteredUnitModel> setUnitGroup({
+    required String studentUnitId,
+    required String classGroup,
+  }) async {
+    try {
+      final response = await apiClient.dio.patch(
+        'courses/my-courses/$studentUnitId/group/',
+        data: {'class_group': classGroup},
+      );
+      return RegisteredUnitModel.fromJson(response.data as Map<String, dynamic>);
+    } catch (e, stack) {
+      dev.log('Error setting unit group', error: e, stackTrace: stack, name: 'TimetableRepository');
       rethrow;
     }
   }

@@ -71,6 +71,13 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         automaticallyImplyLeading: false,
         title: const Text('Class Schedule'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.groups_outlined),
+            tooltip: 'Your Class Groups',
+            onPressed: () => context.push('/select-groups'),
+          ),
+        ],
        ),
       body: RefreshIndicator(
         onRefresh: () => ref.read(timetableProvider.notifier).fetchMySchedule(),
@@ -97,6 +104,10 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
             ),
 
             const SizedBox(height: 16),
+            if (state.unitsNeedingGroupSelection.isNotEmpty) ...[
+              _GroupSelectionBanner(count: state.unitsNeedingGroupSelection.length),
+              const SizedBox(height: 12),
+            ],
             if (state.isFromCache) ...[
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -225,6 +236,47 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     final daySessions = sessions.where((s) => s.dayOfWeek.toUpperCase() == keyName).toList();
     daySessions.sort((a, b) => a.startTime.compareTo(b.startTime));
     return daySessions;
+  }
+}
+
+class _GroupSelectionBanner extends StatelessWidget {
+  const _GroupSelectionBanner({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => context.push('/select-groups'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.groups_outlined, size: 20, color: AppTheme.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                count == 1
+                    ? '1 unit needs your class group — tap to pick it'
+                    : '$count units need your class group — tap to pick them',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.getTextPrimary(context),
+                ),
+              ),
+            ),
+            Icon(Icons.chevron_right, color: AppTheme.primary),
+          ],
+        ),
+      ),
+    );
   }
 }
 

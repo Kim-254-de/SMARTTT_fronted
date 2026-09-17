@@ -17,6 +17,7 @@ import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/schedule/presentation/schedule_screen.dart';
 import '../../features/schedule/presentation/portal_sync_screen.dart';
 import '../../features/schedule/presentation/manual_sync_screen.dart';
+import '../../features/schedule/presentation/select_groups_screen.dart';
 import '../../features/alerts/presentation/alerts_screen.dart';
 import '../../features/schedule/presentation/student_preferences_screen.dart';
 import '../../features/lecturer/presentation/screens/lecturer_shell_screen.dart';
@@ -114,6 +115,11 @@ GoRouter createRouter(Ref ref) {
         builder: (context, state) => const ManualSyncScreen(),
       ),
       GoRoute(
+        path: '/select-groups',
+        name: 'select-groups',
+        builder: (context, state) => const SelectGroupsScreen(),
+      ),
+      GoRoute(
         path: '/profile',
         name: 'profile',
         builder: (context, state) => const ProfileScreen(),
@@ -166,7 +172,7 @@ GoRouter createRouter(Ref ref) {
 
       // Keep each role inside its own home area — a lecturer landing on the
       // student shell (or vice versa) gets bounced to their own home.
-      final studentOnlyRoutes = ['/home', '/schedule', '/portal-sync', '/manual-sync'];
+      final studentOnlyRoutes = ['/home', '/schedule', '/portal-sync', '/manual-sync', '/select-groups'];
       if (isLecturer && studentOnlyRoutes.contains(state.matchedLocation)) return '/lecturer/home';
       if (!isLecturer && state.matchedLocation == '/lecturer/home') return '/home';
 

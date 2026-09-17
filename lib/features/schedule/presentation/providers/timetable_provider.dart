@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/error_message.dart';
 import '../../data/timetable_repository.dart';
+import '../../domain/models/registered_unit_model.dart';
 import '../../domain/models/timetable_session_model.dart';
 
 class TimetableState {
@@ -12,6 +13,7 @@ class TimetableState {
   final List<Map<String, dynamic>> conflicts;
   final int unitCount;
   final bool isFromCache;
+  final List<RegisteredUnitModel> registeredUnits;
 
   TimetableState({
     this.isLoading = false,
@@ -21,7 +23,14 @@ class TimetableState {
     this.conflicts = const [],
     this.unitCount = 0,
     this.isFromCache = false,
+    this.registeredUnits = const [],
   });
+
+  /// Units split into elective/practical groups the student hasn't picked
+  /// theirs for yet — the schedule shows every group's sessions for these
+  /// until they do. Drives the "pick your groups" prompt/banner.
+  List<RegisteredUnitModel> get unitsNeedingGroupSelection =>
+      registeredUnits.where((u) => u.needsGroupSelection).toList();
 
   TimetableState copyWith({
     bool? isLoading,
@@ -31,6 +40,7 @@ class TimetableState {
     List<Map<String, dynamic>>? conflicts,
     int? unitCount,
     bool? isFromCache,
+    List<RegisteredUnitModel>? registeredUnits,
   }) {
     return TimetableState(
       isLoading: isLoading ?? this.isLoading,
@@ -40,6 +50,7 @@ class TimetableState {
       conflicts: conflicts ?? this.conflicts,
       unitCount: unitCount ?? this.unitCount,
       isFromCache: isFromCache ?? this.isFromCache,
+      registeredUnits: registeredUnits ?? this.registeredUnits,
     );
   }
 }
@@ -123,6 +134,7 @@ class TimetableNotifier extends Notifier<TimetableState> {
         unitCount: result.unitCount,
         error: result.message,
         isFromCache: result.isFromCache,
+        registeredUnits: state.registeredUnits,
       );
     } catch (e) {
       // If we already have cached sessions, preserve them!
@@ -137,6 +149,41 @@ class TimetableNotifier extends Notifier<TimetableState> {
           ),
         );
       }
+    }
+
+    // Refresh which registered units still need a group pick. Best-effort:
+    // a failure here shouldn't take down the schedule the fetch above just
+    // loaded successfully.
+    try {
+      state = state.copyWith(registeredUnits: await _repository.fetchMyCourses());
+    } catch (_) {
+      // Keep whatever registeredUnits state already had.
+    }
+  }
+
+  /// Records which elective/practical group the student is in for one
+  /// registered unit, then refreshes both the unit list and the schedule so
+  /// the newly-narrowed sessions show immediately.
+  Future<bool> setUnitGroup({
+    required String studentUnitId,
+    required String classGroup,
+  }) async {
+    try {
+      final updated = await _repository.setUnitGroup(
+        studentUnitId: studentUnitId,
+        classGroup: classGroup,
+      );
+      state = state.copyWith(
+        registeredUnits: [
+          for (final u in state.registeredUnits)
+            if (u.id == updated.id) updated else u,
+        ],
+      );
+      await fetchMySchedule();
+      return true;
+    } catch (e) {
+      state = state.copyWith(error: _formatError(e, fallback: 'Could not save your group. Please try again.'));
+      return false;
     }
   }
 
