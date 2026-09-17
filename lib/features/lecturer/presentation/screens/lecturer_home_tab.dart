@@ -43,14 +43,18 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Lecturer Portal',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isDarkMode ? Colors.white : Colors.black87,
+                    ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: LecturerColors.navyBg,
+                      color: isDarkMode ? LecturerColors.primary.withValues(alpha: 0.2) : LecturerColors.navyBg,
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: Text(
@@ -61,17 +65,17 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
                 ],
               ),
               const SizedBox(height: 20),
-              _buildStatsStrip(dashboard?.summary),
+              _buildStatsStrip(dashboard?.summary, isDarkMode),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 'My Timetable',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.grey[400] : Colors.grey),
               ),
               const SizedBox(height: 12),
-              _buildTimetableSection(dashboard?.timetable ?? {}),
+              _buildTimetableSection(dashboard?.timetable ?? {}, isDarkMode),
               if (selectedUnitIdForRoster != null) ...[
                 const SizedBox(height: 24),
-                _buildStudentRosterCard(),
+                _buildStudentRosterCard(isDarkMode),
               ],
             ],
           ),
@@ -80,19 +84,19 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
     );
   }
 
-  Widget _buildStatsStrip(LecturerSummaryModel? summary) {
+  Widget _buildStatsStrip(LecturerSummaryModel? summary, bool isDarkMode) {
     return Row(
       children: [
-        Expanded(child: _StatCard(value: '${summary?.unitsCount ?? 0}', label: 'Units this term')),
+        Expanded(child: _StatCard(value: '${summary?.unitsCount ?? 0}', label: 'Units this term', isDarkMode: isDarkMode)),
         const SizedBox(width: 12),
-        Expanded(child: _StatCard(value: '${summary?.weeklySessions ?? 0}', label: 'Weekly sessions')),
+        Expanded(child: _StatCard(value: '${summary?.weeklySessions ?? 0}', label: 'Weekly sessions', isDarkMode: isDarkMode)),
         const SizedBox(width: 12),
-        Expanded(child: _StatCard(value: '${summary?.totalStudents ?? 0}', label: 'Total students')),
+        Expanded(child: _StatCard(value: '${summary?.totalStudents ?? 0}', label: 'Total students', isDarkMode: isDarkMode)),
       ],
     );
   }
 
-  Widget _buildTimetableSection(Map<String, List<LecturerSessionModel>> timetable) {
+  Widget _buildTimetableSection(Map<String, List<LecturerSessionModel>> timetable, bool isDarkMode) {
     const dayOrder = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
     final dayNames = {'MON': 'Monday', 'TUE': 'Tuesday', 'WED': 'Wednesday', 'THU': 'Thursday', 'FRI': 'Friday', 'SAT': 'Saturday'};
 
@@ -102,8 +106,14 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
       return Container(
         padding: const EdgeInsets.all(30),
         alignment: Alignment.center,
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-        child: const Text('No classes assigned for this term yet.', style: TextStyle(color: Colors.grey)),
+        decoration: BoxDecoration(
+          color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          'No classes assigned for this term yet.',
+          style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey),
+        ),
       );
     }
 
@@ -117,7 +127,7 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(
-                color: LecturerColors.navyBg,
+                color: isDarkMode ? LecturerColors.primary.withValues(alpha: 0.2) : LecturerColors.navyBg,
                 borderRadius: BorderRadius.circular(100),
               ),
               child: Text(
@@ -126,7 +136,7 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
               ),
             ),
             const SizedBox(height: 8),
-            ...sessions.map((slot) => _buildSlotCard(slot)),
+            ...sessions.map((slot) => _buildSlotCard(slot, isDarkMode)),
             const SizedBox(height: 16),
           ],
         );
@@ -134,20 +144,20 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
     );
   }
 
-  Widget _buildSlotCard(LecturerSessionModel slot) {
+  Widget _buildSlotCard(LecturerSessionModel slot, bool isDarkMode) {
     return InkWell(
       onTap: () => fetchStudentsForUnit(slot.unitId, '${slot.unitCode} — ${slot.unitName}'),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: const Border(
-            top: BorderSide(color: Color(0xFFE2E8F0)),
-            right: BorderSide(color: Color(0xFFE2E8F0)),
-            bottom: BorderSide(color: Color(0xFFE2E8F0)),
-            left: BorderSide(color: LecturerColors.primary, width: 4), // Correct left border styling
+          border: Border(
+            top: BorderSide(color: isDarkMode ? Colors.grey[800]! : const Color(0xFFE2E8F0)),
+            right: BorderSide(color: isDarkMode ? Colors.grey[800]! : const Color(0xFFE2E8F0)),
+            bottom: BorderSide(color: isDarkMode ? Colors.grey[800]! : const Color(0xFFE2E8F0)),
+            left: const BorderSide(color: LecturerColors.primary, width: 4), // Correct left border styling
           ),
         ),
         child: Column(
@@ -160,12 +170,12 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
             const SizedBox(height: 4),
             Text(
               slot.unitName,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black87),
             ),
             const SizedBox(height: 3),
             Text(
               '${slot.unitCode} ${slot.room.isNotEmpty ? '· ${slot.room}' : ''} ${slot.program.isNotEmpty ? '· ${slot.program}' : ''}',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.grey[400] : Colors.grey),
             ),
           ],
         ),
@@ -191,13 +201,13 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
     }
   }
 
-  Widget _buildStudentRosterCard() {
+  Widget _buildStudentRosterCard(bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDarkMode ? Colors.grey[800]! : const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,18 +215,27 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Students — ${selectedUnitLabel ?? ""}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                'Students — ${selectedUnitLabel ?? ""}',
+                style: TextStyle(fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black87),
+              ),
               IconButton(
-                icon: const Icon(Icons.close, size: 16),
+                icon: Icon(Icons.close, size: 16, color: isDarkMode ? Colors.grey[400] : Colors.black87),
                 onPressed: () => setState(() => selectedUnitIdForRoster = null),
               ),
             ],
           ),
-          const Divider(),
+          Divider(color: isDarkMode ? Colors.grey[800] : null),
           isLoadingRoster
               ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
               : rosterStudents.isEmpty
-                  ? const Padding(padding: EdgeInsets.all(20), child: Text('No enrolled students data loaded.', style: TextStyle(color: Colors.grey)))
+                  ? Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text(
+                        'No enrolled students data loaded.',
+                        style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey),
+                      ),
+                    )
                   : ListView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -225,8 +244,14 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
                         final s = rosterStudents[idx];
                         return ListTile(
                           dense: true,
-                          title: Text(s['name'] ?? 'Student'),
-                          subtitle: Text(s['email'] ?? ''),
+                          title: Text(
+                            s['name'] ?? 'Student',
+                            style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87),
+                          ),
+                          subtitle: Text(
+                            s['email'] ?? '',
+                            style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
+                          ),
                           trailing: Chip(label: Text(s['university_id'] ?? 'ID')),
                         );
                       },
@@ -240,23 +265,28 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
 class _StatCard extends StatelessWidget {
   final String value;
   final String label;
+  final bool isDarkMode;
 
-  const _StatCard({required this.value, required this.label});
+  const _StatCard({required this.value, required this.label, required this.isDarkMode});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDarkMode ? Colors.grey[800]! : const Color(0xFFE2E8F0)),
       ),
       child: Column(
         children: [
           Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: LecturerColors.primary)),
           const SizedBox(height: 2),
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: isDarkMode ? Colors.grey[400] : Colors.grey),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );

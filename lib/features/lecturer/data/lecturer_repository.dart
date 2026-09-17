@@ -37,13 +37,8 @@ class LecturerRepository {
         'expected_students': expectedStudents,
       });
     } on DioException catch (e) {
-      final data = e.response?.data;
-      if (data is Map && data.containsKey('capacity_error')) {
-        final suggestions = (data['suggested_rooms'] as List? ?? [])
-            .map((r) => Map<String, dynamic>.from(r as Map))
-            .toList();
-        throw VenueCapacityException(data['capacity_error'].toString(), suggestions);
-      }
+      final capacityError = _tryParseCapacityError(e.response?.data);
+      if (capacityError != null) throw capacityError;
       throw _handleError(e);
     } catch (e) {
       throw _handleError(e);
@@ -72,13 +67,8 @@ class LecturerRepository {
       });
       return Map<String, dynamic>.from(response.data as Map);
     } on DioException catch (e) {
-      final data = e.response?.data;
-      if (data is Map && data.containsKey('capacity_error')) {
-        final suggestions = (data['suggested_rooms'] as List? ?? [])
-            .map((r) => Map<String, dynamic>.from(r as Map))
-            .toList();
-        throw VenueCapacityException(data['capacity_error'].toString(), suggestions);
-      }
+      final capacityError = _tryParseCapacityError(e.response?.data);
+      if (capacityError != null) throw capacityError;
       throw _handleError(e);
     } catch (e) {
       throw _handleError(e);
@@ -100,6 +90,24 @@ class LecturerRepository {
     } catch (e) {
       throw _handleError(e);
     }
+  }
+
+  /// DRF's serializer error formatting wraps every field in a list, so
+  /// `capacity_error` arrives as `[String]` and `suggested_rooms` as
+  /// `[List<Map>]` (a one-element list wrapping the actual list) rather
+  /// than as bare values.
+  VenueCapacityException? _tryParseCapacityError(dynamic data) {
+    if (data is! Map || !data.containsKey('capacity_error')) return null;
+    final rawError = data['capacity_error'];
+    final message = rawError is List && rawError.isNotEmpty ? rawError.first.toString() : rawError.toString();
+
+    final rawSuggestions = data['suggested_rooms'];
+    final suggestionsList = rawSuggestions is List && rawSuggestions.isNotEmpty && rawSuggestions.first is List
+        ? rawSuggestions.first as List
+        : (rawSuggestions is List ? rawSuggestions : const []);
+    final suggestions = suggestionsList.map((r) => Map<String, dynamic>.from(r as Map)).toList();
+
+    return VenueCapacityException(message, suggestions);
   }
 
   Exception _handleError(Object e) {

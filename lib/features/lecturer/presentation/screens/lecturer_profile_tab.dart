@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import '../providers/lecturer_dashboard_provider.dart';
 import 'package:smart/features/auth/presentation/providers/auth_provider.dart';
+import 'package:smart/core/theme/theme_provider.dart';
+import 'package:smart/core/theme/notifications_provider.dart';
 import '../widgets/lecturer_colors.dart';
 
 class LecturerProfileTab extends ConsumerWidget {
@@ -86,9 +88,9 @@ class LecturerProfileTab extends ConsumerWidget {
             icon: Icons.notifications_active_outlined,
             title: 'Timetable Change Alerts',
             subtitle: 'Receive instant notifications for rescheduled classes',
-            value: true,
+            value: ref.watch(notificationsEnabledProvider),
             isDarkMode: isDarkMode,
-            onChanged: (val) {},
+            onChanged: (val) => ref.read(notificationsEnabledProvider.notifier).toggle(val),
           ),
           _buildSwitchTile(
             icon: Icons.dark_mode_outlined,
@@ -96,7 +98,7 @@ class LecturerProfileTab extends ConsumerWidget {
             subtitle: 'Toggle app color appearance',
             value: isDarkMode,
             isDarkMode: isDarkMode,
-            onChanged: (val) {},
+            onChanged: (val) => ref.read(themeProvider.notifier).toggleTheme(),
           ),
           const SizedBox(height: 24),
           const Text(
@@ -109,7 +111,7 @@ class LecturerProfileTab extends ConsumerWidget {
             title: 'Timetable Administrator Helpdesk',
             subtitle: 'Report scheduling conflicts or venue clashes',
             isDarkMode: isDarkMode,
-            onTap: () {},
+            onTap: () => context.push('/support'),
           ),
           const SizedBox(height: 12),
           _buildSettingTile(
