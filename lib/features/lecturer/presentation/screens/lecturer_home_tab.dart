@@ -72,7 +72,7 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.grey[400] : Colors.grey),
               ),
               const SizedBox(height: 12),
-              _buildTimetableSection(dashboard?.timetable ?? {}, isDarkMode),
+              _buildTimetableSection(dashboard, isDarkMode),
               if (selectedUnitIdForRoster != null) ...[
                 const SizedBox(height: 24),
                 _buildStudentRosterCard(isDarkMode),
@@ -96,13 +96,12 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
     );
   }
 
-  Widget _buildTimetableSection(Map<String, List<LecturerSessionModel>> timetable, bool isDarkMode) {
-    const dayOrder = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-    final dayNames = {'MON': 'Monday', 'TUE': 'Tuesday', 'WED': 'Wednesday', 'THU': 'Thursday', 'FRI': 'Friday', 'SAT': 'Saturday'};
+  Widget _buildTimetableSection(LecturerDashboardModel? dashboard, bool isDarkMode) {
+    final dayNames = {'MON': 'Monday', 'TUE': 'Tuesday', 'WED': 'Wednesday', 'THU': 'Thursday', 'FRI': 'Friday', 'SAT': 'Saturday', 'SUN': 'Sunday'};
+    final today = dashboard?.today ?? 'MON';
+    final sessions = dashboard?.todaySessions ?? [];
 
-    final activeDays = dayOrder.where((d) => timetable.containsKey(d) && timetable[d]!.isNotEmpty).toList();
-
-    if (activeDays.isEmpty) {
+    if (sessions.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(30),
         alignment: Alignment.center,
@@ -111,7 +110,7 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
-          'No classes assigned for this term yet.',
+          'No classes scheduled for today.',
           style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey),
         ),
       );
@@ -119,28 +118,38 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: activeDays.map((day) {
-        final sessions = timetable[day]!;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-              decoration: BoxDecoration(
-                color: isDarkMode ? LecturerColors.primary.withValues(alpha: 0.2) : LecturerColors.navyBg,
-                borderRadius: BorderRadius.circular(100),
-              ),
-              child: Text(
-                dayNames[day] ?? day,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: LecturerColors.primary),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ...sessions.map((slot) => _buildSlotCard(slot, isDarkMode)),
-            const SizedBox(height: 16),
-          ],
-        );
-      }).toList(),
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(
+            color: isDarkMode ? LecturerColors.primary.withValues(alpha: 0.2) : LecturerColors.navyBg,
+            borderRadius: BorderRadius.circular(100),
+          ),
+          child: Text(
+            dayNames[today] ?? today,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: LecturerColors.primary),
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Lay sessions out in a grid rather than one full-width card per row,
+        // so today's classes fill the available horizontal space instead of
+        // leaving it empty next to a narrow stacked column.
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const spacing = 12.0;
+            const minCardWidth = 260.0;
+            final columns = (constraints.maxWidth / minCardWidth).floor().clamp(1, 4);
+            final cardWidth = (constraints.maxWidth - spacing * (columns - 1)) / columns;
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: sessions
+                  .map((slot) => SizedBox(width: cardWidth, child: _buildSlotCard(slot, isDarkMode)))
+                  .toList(),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -148,7 +157,6 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
     return InkWell(
       onTap: () => fetchStudentsForUnit(slot.unitId, '${slot.unitCode} — ${slot.unitName}'),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
