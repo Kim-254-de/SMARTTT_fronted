@@ -141,12 +141,15 @@ GoRouter createRouter(Ref ref) {
       ),
     ],
     redirect: (context, state) {
+      // Reset links arrive by email and must open whether or not someone is
+      // signed in on this device.
+      if (state.matchedLocation == '/reset-password') return null;
+
       final authState = ref.read(authProvider);
       final isAuthEntry = state.matchedLocation == '/' ||
           state.matchedLocation == '/login' ||
           state.matchedLocation == '/register' ||
-          state.matchedLocation == '/forgot-password' ||
-          state.matchedLocation == '/reset-password';
+          state.matchedLocation == '/forgot-password';
       final isPublicPolicyPage = state.matchedLocation == '/terms' ||
           state.matchedLocation == '/privacy';
 
