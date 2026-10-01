@@ -19,8 +19,6 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _acceptedPrivacy = false;
-  bool _acceptedTerms = false;
 
   @override
   void dispose() {
@@ -122,91 +120,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               
               const SizedBox(height: 32),
 
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _acceptedPrivacy,
-                activeColor: AppTheme.primary,
-                controlAffinity: ListTileControlAffinity.leading,
-                title: Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      'I agree to the ',
-                      style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 13),
-                    ),
-                    InkWell(
-                      onTap: () => context.pushNamed('privacy'),
-                      child: Text(
-                        'Privacy Policy',
-                        style: TextStyle(
-                          color: AppTheme.primary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          decoration: TextDecoration.underline,
-                          decorationColor: AppTheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                onChanged: (value) => setState(() => _acceptedPrivacy = value ?? false),
-                dense: true,
-                side: BorderSide(color: AppTheme.getBorder(context)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-
-              const SizedBox(height: 8),
-
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _acceptedTerms,
-                activeColor: AppTheme.primary,
-                controlAffinity: ListTileControlAffinity.leading,
-                title: Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      'I agree to the ',
-                      style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 13),
-                    ),
-                    InkWell(
-                      onTap: () => context.pushNamed('terms'),
-                      child: Text(
-                        'Terms & Conditions',
-                        style: TextStyle(
-                          color: AppTheme.primary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          decoration: TextDecoration.underline,
-                          decorationColor: AppTheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                onChanged: (value) => setState(() => _acceptedTerms = value ?? false),
-                dense: true,
-                side: BorderSide(color: AppTheme.getBorder(context)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-
-              const SizedBox(height: 12),
-              
               if (authState.isLoading)
                 const Center(child: CircularProgressIndicator())
               else
                 PremiumButton(
                   text: 'Sign In',
                   onPressed: () {
-                    if (!_acceptedPrivacy || !_acceptedTerms) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please accept both the Privacy Policy and Terms & Conditions first.'),
-                          backgroundColor: AppTheme.error,
-                        ),
-                      );
-                      return;
-                    }
                     ref.read(authProvider.notifier).login(
                       _emailController.text,
                       _passwordController.text,
@@ -214,6 +133,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   },
                 ).animate().fadeIn(delay: 700.ms).scale(),
               
+              // Google sign-in is for students only; lecturers use their staff account
+              if (!isLecturer) ...[
               const SizedBox(height: 40),
               
               Row(
@@ -238,6 +159,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 32),
               
               const SocialAuthButtons().animate().fadeIn(delay: 900.ms).moveY(begin: 10),
+              ],
               
               const SizedBox(height: 40),
               

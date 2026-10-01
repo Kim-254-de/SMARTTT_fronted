@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/lecturer_repository.dart';
 import '../../domain/models/lecturer_dashboard_model.dart';
+import '../../../../core/network/error_message.dart';
 
 class LecturerDashboardState {
   final bool isLoading;
@@ -40,7 +41,7 @@ class LecturerDashboardNotifier extends Notifier<LecturerDashboardState> {
       final dashboard = await _repository.fetchDashboard();
       state = LecturerDashboardState(isLoading: false, dashboard: dashboard);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString().replaceFirst('Exception: ', ''));
+      state = state.copyWith(isLoading: false, error: friendlyErrorMessage(e, fallbackMessage: 'Could not load your teaching dashboard. Pull down to try again.'));
     }
   }
 }

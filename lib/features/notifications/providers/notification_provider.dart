@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/notification_repository.dart';
 import '../domain/notification_model.dart';
 import '../services/fcm_service.dart';
+import '../../../core/network/error_message.dart';
 
 class NotificationState {
   final bool isLoading;
@@ -56,7 +57,7 @@ class NotificationNotifier extends Notifier<NotificationState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        error: e.toString().replaceFirst('Exception: ', ''),
+        error: friendlyErrorMessage(e, fallbackMessage: 'Could not load your notifications. Please try again.'),
       );
     }
   }

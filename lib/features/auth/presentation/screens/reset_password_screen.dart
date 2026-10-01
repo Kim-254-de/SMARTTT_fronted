@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../widgets/premium_button.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_text_field.dart';
+import '../../../../core/network/error_message.dart';
 
 class ResetPasswordScreen extends ConsumerStatefulWidget {
   final String token;
@@ -53,7 +54,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
         context.go('/login');
       }
     } catch (error) {
-      if (mounted) _showMessage(error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) _showMessage(friendlyErrorMessage(error, fallbackMessage: 'Could not reset your password. The link may have expired; request a new one.'));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

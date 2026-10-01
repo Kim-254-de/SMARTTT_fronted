@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../widgets/premium_button.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_text_field.dart';
+import '../../../../core/network/error_message.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -37,7 +38,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       await ref.read(authRepositoryProvider).forgotPassword(email);
       if (mounted) _showMessage('If an account exists, a recovery link has been sent.');
     } catch (error) {
-      if (mounted) _showMessage(error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) _showMessage(friendlyErrorMessage(error, fallbackMessage: 'Could not send the recovery link. Please try again.'));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

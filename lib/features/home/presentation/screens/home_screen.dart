@@ -372,12 +372,10 @@ class _HomeTab extends ConsumerWidget {
     }
 
     if (state.error != null) {
-      final isAuthError = state.error!.contains('401') || state.error!.toLowerCase().contains('unauthorized');
+      final isAuthError = state.error!.toLowerCase().contains('session has expired');
       final cleanMessage = isAuthError
           ? 'Your session has expired. Please log in again.'
-          : (state.error!.contains('SocketException') || state.error!.contains('connection')
-              ? 'Network error. Please check your internet connection.'
-              : 'Unable to load today\'s schedule. Tap to retry.');
+          : state.error!;
 
       return Container(
         width: double.infinity,

@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/error_message.dart';
 import '../domain/models/department_model.dart';
 import '../domain/models/user_model.dart';
 
@@ -224,47 +224,6 @@ class AuthRepository {
     throw Exception('Invalid user response format');
   }
 
-  /// Converts DioException server errors into readable Exception messages.
-  Exception _handleError(Object e) {
-    if (e is DioException) {
-      final data = e.response?.data;
-      final statusCode = e.response?.statusCode;
-      if (data is Map && data.isNotEmpty) {
-        if (data.containsKey('detail')) return Exception(data['detail'].toString());
-        if (data.containsKey('message')) return Exception(data['message'].toString());
-        final first = data.values.first;
-        if (first is List && first.isNotEmpty) return Exception(first.first.toString());
-        return Exception('Please check the information you entered and try again.');
-      }
-      if (statusCode != null) {
-        if (statusCode >= 500) {
-          return Exception('The server is temporarily unavailable. Please try again later.');
-        } else if (statusCode == 400) {
-          return Exception('Please check the information you entered and try again.');
-        } else if (statusCode == 401) {
-          final isLogin = e.requestOptions.path.contains('auth/login');
-          return Exception(
-            isLogin
-                ? 'The email or password is incorrect.'
-                : 'Your session has expired. Please sign in again.',
-          );
-        } else if (statusCode == 403) {
-          return Exception('You do not have permission to perform this action.');
-        } else if (statusCode == 404) {
-          return Exception('We could not find what you requested. Please try again.');
-        }
-      }
-      if (e.type == DioExceptionType.connectionError) {
-        return Exception('Unable to reach the server. Please check your connection and try again.');
-      }
-      if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.sendTimeout ||
-          e.type == DioExceptionType.receiveTimeout) {
-        return Exception('The request took too long. Please try again.');
-      }
-      return Exception('Something went wrong. Please try again.');
-    }
-    if (e is Exception) return e;
-    return Exception(e.toString());
-  }
+  /// Converts any failure into an Exception carrying a user-friendly message.
+  Exception _handleError(Object e) => Exception(friendlyErrorMessage(e));
 }

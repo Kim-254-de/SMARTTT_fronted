@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/error_message.dart';
 import '../domain/models/lecturer_dashboard_model.dart';
 
 /// Thrown when a venue-change notification fails the room-capacity check.
@@ -110,20 +111,5 @@ class LecturerRepository {
     return VenueCapacityException(message, suggestions);
   }
 
-  Exception _handleError(Object e) {
-    if (e is DioException) {
-      final data = e.response?.data;
-      if (data is Map && data.isNotEmpty) {
-        if (data.containsKey('detail')) return Exception(data['detail'].toString());
-        final first = data.values.first;
-        if (first is List && first.isNotEmpty) return Exception(first.first.toString());
-      }
-      final statusCode = e.response?.statusCode;
-      if (statusCode != null && statusCode >= 500) {
-        return Exception('The server is temporarily unavailable. Please try again later.');
-      }
-      return Exception('Something went wrong. Please try again.');
-    }
-    return Exception('Something went wrong. Please try again.');
-  }
+  Exception _handleError(Object e) => Exception(friendlyErrorMessage(e));
 }

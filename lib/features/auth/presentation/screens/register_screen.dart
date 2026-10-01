@@ -282,6 +282,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   },
                 ).animate().fadeIn(delay: 600.ms).scale(),
               
+              // Google sign-in is for students only; lecturers use their staff account
+              if (!isLecturer) ...[
               const SizedBox(height: 40),
               
               Row(
@@ -306,6 +308,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               const SizedBox(height: 32),
               
               const SocialAuthButtons().animate().fadeIn(delay: 800.ms).moveY(begin: 10),
+              ],
               
               const SizedBox(height: 40),
               
