@@ -115,6 +115,31 @@
   .errors-box div { padding: 3px 0; color: var(--text-secondary); }
   .logout-link { color: var(--text-secondary); font-size: 13px; cursor: pointer; text-decoration: underline; }
   .empty-state { text-align: center; padding: 30px; color: var(--text-muted); }
+  .admin-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg);
+    padding: 10px 0 16px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-btn {
+    background: var(--surface);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-strong);
+    border-radius: 100px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .nav-btn:hover { background: var(--surface-2); color: var(--text-primary); }
+  .nav-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
 </style>
 </head>
 <body>
@@ -148,8 +173,19 @@
       ⚡ You are currently offline. Administrative actions (uploads, notifications) require an internet connection.
     </div>
 
+    <nav class="admin-nav">
+      <button class="nav-btn" id="navbtn-upload" onclick="showTab('upload')">Upload Timetable</button>
+      <button class="nav-btn" id="navbtn-terms" onclick="showTab('terms')">Academic Terms</button>
+      <button class="nav-btn" id="navbtn-notify" onclick="showTab('notify')">Send Notification</button>
+      <button class="nav-btn" id="navbtn-notifyHistory" onclick="showTab('notifyHistory')">Notification History</button>
+      <button class="nav-btn" id="navbtn-allocation" onclick="showTab('allocation')">Lecturer Allocation</button>
+      <button class="nav-btn" id="navbtn-staffIds" onclick="showTab('staffIds')">Staff IDs</button>
+      <button class="nav-btn" id="navbtn-venues" onclick="showTab('venues')">Venue Capacities</button>
+      <button class="nav-btn" id="navbtn-uploadHistory" onclick="showTab('uploadHistory')">Upload History</button>
+    </nav>
+
     <!-- Upload card -->
-    <div class="card">
+    <div class="card tab-panel" id="panel-upload">
       <h2>Upload master timetable</h2>
       <div id="uploadStatus"></div>
       <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.pdf">
@@ -162,7 +198,7 @@
     </div>
 
     <!-- Terms card -->
-    <div class="card">
+    <div class="card tab-panel" id="panel-terms">
       <h2>Academic terms</h2>
       <div id="termsStatus"></div>
       <table>
@@ -173,7 +209,7 @@
     </div>
 
     <!-- Send notification card -->
-    <div class="card">
+    <div class="card tab-panel" id="panel-notify">
       <h2>Send notification</h2>
       <div id="notifStatus"></div>
 
@@ -223,7 +259,7 @@
     </div>
 
     <!-- Notification history card -->
-    <div class="card">
+    <div class="card tab-panel" id="panel-notifyHistory">
       <h2>Notification history</h2>
       <div id="notifHistoryStatus"></div>
       <table>
@@ -238,7 +274,7 @@
     </div>
 
     <!-- Lecturer allocation card -->
-    <div class="card">
+    <div class="card tab-panel" id="panel-allocation">
       <h2>Lecturer allocation — unit assignments</h2>
       <p style="color:var(--text-secondary);font-size:13px;margin-bottom:14px;">
         Upload the department course allocation <strong>.docx</strong> file.
@@ -267,7 +303,7 @@
     </div>
 
     <!-- Staff ID upload card -->
-    <div class="card">
+    <div class="card tab-panel" id="panel-staffIds">
       <h2>Staff IDs — Lecturer verification</h2>
       <p style="color:var(--text-secondary);font-size:13px;margin-bottom:14px;">
         Upload a CSV of valid staff IDs so lecturers can self-register.
@@ -292,7 +328,7 @@
     </div>
 
     <!-- Venue capacities card -->
-    <div class="card">
+    <div class="card tab-panel" id="panel-venues">
       <h2>Venue capacities</h2>
       <p style="color:var(--text-secondary);font-size:13px;margin-bottom:14px;">
         Upload a <strong>.csv</strong> or <strong>.xlsx</strong> listing each venue and how many students it holds.
@@ -320,7 +356,7 @@
     </div>
 
     <!-- Uploads history card -->
-    <div class="card">
+    <div class="card tab-panel" id="panel-uploadHistory">
       <h2>Upload history</h2>
       <div id="uploadsStatus"></div>
       <table>
@@ -498,6 +534,23 @@ function showLoginView() {
 function showAdminView() {
   document.getElementById('loginView').classList.add('hidden');
   document.getElementById('adminView').classList.remove('hidden');
+  showTab(localStorage.getItem('admin_active_tab') || 'upload');
+}
+
+// ───────────────── Tab navigation ─────────────────
+// Swap which function's card is visible instead of making the admin scroll
+// past every other section to find the one they need.
+function showTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+
+  const panel = document.getElementById('panel-' + name);
+  const btn = document.getElementById('navbtn-' + name);
+  if (!panel || !btn) return;
+
+  panel.classList.remove('hidden');
+  btn.classList.add('active');
+  localStorage.setItem('admin_active_tab', name);
 }
 
 // ───────────────── Upload with Polling ─────────────────
