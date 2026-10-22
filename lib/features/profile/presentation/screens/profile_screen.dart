@@ -4,11 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/theme/theme_provider.dart';
 import '../../../../core/theme/locale_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/theme/notifications_provider.dart';
 import '../../../notifications/services/fcm_service.dart';
+import '../../../../widgets/theme_cycle_button.dart';
+import '../widgets/change_password_link.dart';
 import '../widgets/delete_account_dialog.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -17,7 +18,6 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
-    final themeMode = ref.watch(themeProvider);
     final currentLocale = ref.watch(localeProvider);
     final user = authState.user;
 
@@ -26,6 +26,7 @@ class ProfileScreen extends ConsumerWidget {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Text(context.tr('My Profile')),
+        actions: const [ThemeCycleButton(), SizedBox(width: 8)],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -100,6 +101,19 @@ class ProfileScreen extends ConsumerWidget {
               ],
             ).animate().fadeIn(delay: 100.ms).moveY(begin: 20),
 
+            if (user != null) ...[
+              const SizedBox(height: 24),
+              // ── Security ─────────────────────────────────────────────────
+              _buildSection(
+                context,
+                title: context.tr('Security'),
+                children: [
+                  _buildActionTile(context, Iconsax.key, context.tr('Change Password'), null,
+                      () => sendChangePasswordLink(context, ref, user.email)),
+                ],
+              ).animate().fadeIn(delay: 150.ms).moveY(begin: 20),
+            ],
+
             const SizedBox(height: 24),
 
             // ── App Preferences ────────────────────────────────────────────
@@ -107,13 +121,6 @@ class ProfileScreen extends ConsumerWidget {
               context,
               title: context.tr('App Preferences'),
               children: [
-                _buildToggleTile(
-                  context,
-                  Iconsax.moon,
-                  context.tr('Dark Mode'),
-                  themeMode == ThemeMode.dark,
-                  (val) => ref.read(themeProvider.notifier).toggleTheme(),
-                ),
                 Consumer(
                   builder: (context, ref, _) {
                     final enabled = ref.watch(notificationsEnabledProvider);
@@ -169,40 +176,44 @@ class ProfileScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // ── Account ────────────────────────────────────────────────────
-            _buildSection(
-              context,
-              title: context.tr('Account'),
-              children: [
-                _buildActionTile(
-                  context,
-                  Iconsax.trash,
-                  context.tr('Delete Account'),
-                  null,
-                  () async {
-                    final deleted = await showDeleteAccountDialog(context);
-                    if (deleted == true && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(context.tr('Your account has been deleted.'))),
-                      );
-                      context.go('/login');
-                    }
-                  },
-                  isDestructive: true,
+            // ── Sign out, then a quiet Delete account: last, so neither is tapped by accident ──
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  ref.read(authProvider.notifier).logout();
+                  context.go('/');
+                },
+                icon: const Icon(Iconsax.logout, size: 18),
+                label: Text(context.tr('Logout')),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.error,
+                  side: const BorderSide(color: AppTheme.error),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
-                _buildActionTile(
-                  context,
-                  Iconsax.logout,
-                  context.tr('Logout'),
-                  null,
-                  () {
-                    ref.read(authProvider.notifier).logout();
-                    context.go('/');
-                  },
-                  isDestructive: true,
-                ),
-              ],
-            ).animate().fadeIn(delay: 400.ms).moveY(begin: 20),
+              ),
+            ).animate().fadeIn(delay: 400.ms),
+
+            const SizedBox(height: 8),
+
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () async {
+                  final deleted = await showDeleteAccountDialog(context);
+                  if (deleted == true && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(context.tr('Your account has been deleted.'))),
+                    );
+                    context.go('/login');
+                  }
+                },
+                icon: const Icon(Iconsax.trash, size: 16),
+                label: Text(context.tr('Delete Account')),
+                style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+              ),
+            ).animate().fadeIn(delay: 450.ms),
 
             const SizedBox(height: 32),
 

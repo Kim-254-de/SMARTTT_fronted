@@ -1,206 +1,193 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:iconsax/iconsax.dart';
 import '../providers/lecturer_dashboard_provider.dart';
+import 'package:smart/core/theme/app_theme.dart';
 import 'package:smart/features/auth/presentation/providers/auth_provider.dart';
-import 'package:smart/core/theme/theme_provider.dart';
 import 'package:smart/core/theme/notifications_provider.dart';
+import 'package:smart/features/profile/presentation/widgets/change_password_link.dart';
+import 'package:smart/widgets/theme_cycle_button.dart';
 import '../widgets/lecturer_colors.dart';
 
+/// Same order as the attendance profile pages: who you are, your details, settings,
+/// then Sign out last. The theme is the app-bar button, not a switch in the list.
 class LecturerProfileTab extends ConsumerWidget {
   const LecturerProfileTab({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dashboardState = ref.watch(lecturerDashboardProvider);
-    final lecturerInfo = dashboardState.dashboard?.lecturer;
-    final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
+    final lecturerInfo = ref.watch(lecturerDashboardProvider).dashboard?.lecturer;
+    final user = ref.watch(authProvider).user;
+    final rank = lecturerInfo?.rank.isNotEmpty == true ? lecturerInfo!.rank : 'Lecturer';
+    final department = lecturerInfo?.department.isNotEmpty == true ? lecturerInfo!.department : null;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? const Color(0xFF121212) : Colors.white,
+      backgroundColor: AppTheme.getBackground(context),
       appBar: AppBar(
-        title: const Text('Staff Profile & Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Staff Profile', style: TextStyle(fontWeight: FontWeight.bold)),
         elevation: 0,
         backgroundColor: Colors.transparent,
-        foregroundColor: isDarkMode ? Colors.white : Colors.black87,
+        foregroundColor: AppTheme.getTextPrimary(context),
         centerTitle: false,
+        actions: const [ThemeCycleButton(), SizedBox(width: 8)],
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isDarkMode ? Colors.grey[800]! : const Color(0xFFE0E0E0),
+          _card(
+            context,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 32,
+                    backgroundColor: LecturerColors.navyBg,
+                    child: Icon(Icons.person_outline, size: 36, color: LecturerColors.navy),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user?.fullName.isNotEmpty == true ? user!.fullName : 'Lecturer',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.getTextPrimary(context)),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          department == null ? rank : '$rank · $department',
+                          style: TextStyle(fontSize: 13, color: AppTheme.getTextSecondary(context)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: Row(
+          ),
+          const SizedBox(height: 12),
+          _card(
+            context,
+            child: Column(
               children: [
-                CircleAvatar(
-                  radius: 32,
-                  backgroundColor: LecturerColors.navyBg,
-                  child: const Icon(Icons.person_outline, size: 36, color: LecturerColors.navy),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Staff ID: ${lecturerInfo?.staffId ?? 'N/A'}',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black87),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        lecturerInfo?.department ?? 'Department of Computer Science',
-                        style: TextStyle(fontSize: 13, color: isDarkMode ? Colors.grey[400] : Colors.grey[650]),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: LecturerColors.navyBg,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'Rank: ${lecturerInfo?.rank ?? 'Lecturer'}',
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: LecturerColors.navy),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                _infoTile(context, Icons.badge_outlined, 'Staff ID', lecturerInfo?.staffId.isNotEmpty == true ? lecturerInfo!.staffId : 'Not recorded'),
+                if (user != null) _infoTile(context, Icons.mail_outline, 'Email', user.email),
               ],
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'System & Alerts',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
+          _sectionTitle(context, 'Security'),
+          _settingTile(
+            context,
+            icon: Icons.key_outlined,
+            title: 'Change Password',
+            subtitle: 'We email you a link to choose a new one',
+            onTap: user == null ? null : () => sendChangePasswordLink(context, ref, user.email),
           ),
-          const SizedBox(height: 12),
-          _buildSwitchTile(
-            icon: Icons.notifications_active_outlined,
-            title: 'Timetable Change Alerts',
-            subtitle: 'Receive instant notifications for rescheduled classes',
-            value: ref.watch(notificationsEnabledProvider),
-            isDarkMode: isDarkMode,
-            onChanged: (val) => ref.read(notificationsEnabledProvider.notifier).toggle(val),
-          ),
-          _buildSwitchTile(
-            icon: Icons.dark_mode_outlined,
-            title: 'Dark Theme',
-            subtitle: 'Toggle app color appearance',
-            value: isDarkMode,
-            isDarkMode: isDarkMode,
-            onChanged: (val) => ref.read(themeProvider.notifier).toggleTheme(),
+          const SizedBox(height: 14),
+          _sectionTitle(context, 'Alerts'),
+          _card(
+            context,
+            child: SwitchListTile(
+              secondary: const Icon(Icons.notifications_active_outlined, color: LecturerColors.navy),
+              title: Text('Timetable Change Alerts',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.getTextPrimary(context))),
+              subtitle: Text('Receive instant notifications for rescheduled classes',
+                  style: TextStyle(fontSize: 12, color: AppTheme.getTextSecondary(context))),
+              value: ref.watch(notificationsEnabledProvider),
+              activeThumbColor: LecturerColors.navy,
+              onChanged: (val) => ref.read(notificationsEnabledProvider.notifier).toggle(val),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Support & Session',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
-          ),
-          const SizedBox(height: 12),
-          _buildSettingTile(
+          _sectionTitle(context, 'Support'),
+          _settingTile(
+            context,
             icon: Icons.help_outline_rounded,
             title: 'Timetable Administrator Helpdesk',
             subtitle: 'Report scheduling conflicts or venue clashes',
-            isDarkMode: isDarkMode,
             onTap: () => context.push('/support'),
           ),
-          const SizedBox(height: 12),
-          _buildSettingTile(
-            icon: Icons.logout_rounded,
-            title: 'Sign Out',
-            subtitle: 'Log out of the lecturer portal',
-            isDarkMode: isDarkMode,
-            textColor: Colors.red,
-            iconColor: Colors.red,
-            onTap: () async {
-              // Trigger logout clearing tokens and resetting auth state
-              await ref.read(authProvider.notifier).logout();
-              
-              if (context.mounted) {
-                // Redirect user back to the root role selection screen
-                context.go('/'); //
-              }
-            },
+          const SizedBox(height: 28),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                await ref.read(authProvider.notifier).logout();
+                // Back to the role selection screen.
+                if (context.mounted) context.go('/');
+              },
+              icon: const Icon(Icons.logout_rounded, size: 18),
+              label: const Text('Sign Out'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.error,
+                side: const BorderSide(color: AppTheme.error),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSettingTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool isDarkMode,
-    required VoidCallback onTap,
-    Color? textColor,
-    Color? iconColor,
-  }) {
+  Widget _card(BuildContext context, {required Widget child}) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDarkMode ? Colors.grey[800]! : const Color(0xFFE0E0E0),
-        ),
+        color: AppTheme.getSurface(context),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.getBorder(context)),
       ),
-      child: ListTile(
-        leading: Icon(icon, color: iconColor ?? LecturerColors.navy),
-        title: Text(
-          title,
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor ?? (isDarkMode ? Colors.white : Colors.black87)),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.grey[400] : Colors.grey[650]),
-        ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-        onTap: onTap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: child,
+    );
+  }
+
+  Widget _sectionTitle(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 10),
+      child: Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.getTextSecondary(context))),
+    );
+  }
+
+  Widget _infoTile(BuildContext context, IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppTheme.getTextSecondary(context)),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context))),
+                Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.getTextPrimary(context))),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildSwitchTile({
+  Widget _settingTile(
+    BuildContext context, {
     required IconData icon,
     required String title,
     required String subtitle,
-    required bool value,
-    required bool isDarkMode,
-    required ValueChanged<bool> onChanged,
+    required VoidCallback? onTap,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDarkMode ? Colors.grey[800]! : const Color(0xFFE0E0E0),
-        ),
-      ),
-      child: SwitchListTile(
-        secondary: Icon(icon, color: LecturerColors.navy),
-        title: Text(
-          title,
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black87),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.grey[400] : Colors.grey[650]),
-        ),
-        value: value,
-        activeColor: LecturerColors.navy,
-        onChanged: onChanged,
+    return _card(
+      context,
+      child: ListTile(
+        leading: Icon(icon, color: LecturerColors.navy),
+        title: Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.getTextPrimary(context))),
+        subtitle: Text(subtitle, style: TextStyle(fontSize: 12, color: AppTheme.getTextSecondary(context))),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+        onTap: onTap,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
