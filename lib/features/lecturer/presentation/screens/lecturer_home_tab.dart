@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/lecturer_dashboard_provider.dart';
 import '../../domain/models/lecturer_dashboard_model.dart'; // Correct relative path
 import '../widgets/lecturer_colors.dart';
@@ -26,6 +27,40 @@ class _LecturerHomeTabState extends ConsumerState<LecturerHomeTab> {
 
     if (dashboardState.isLoading && dashboard == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (dashboardState.error != null && dashboard == null) {
+      final sessionExpired = dashboardState.error!.toLowerCase().contains('session has expired');
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  sessionExpired ? Icons.lock_clock_outlined : Icons.error_outline_rounded,
+                  size: 48,
+                  color: Colors.red.shade400,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  dashboardState.error!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => sessionExpired
+                      ? context.go('/login')
+                      : ref.read(lecturerDashboardProvider.notifier).fetchDashboard(),
+                  child: Text(sessionExpired ? 'Sign in' : 'Try again'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     return Scaffold(

@@ -5,6 +5,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/api_client.dart';
 import '../../../widgets/premium_button.dart';
+import '../../../core/network/error_message.dart';
 
 class StudentPreferencesScreen extends ConsumerStatefulWidget {
   const StudentPreferencesScreen({Key? key}) : super(key: key);
@@ -106,7 +107,7 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
       if (mounted) {
         setState(() => _isLoadingMetadata = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load timetable metadata: $e'), backgroundColor: AppTheme.error),
+          SnackBar(content: Text(friendlyErrorMessage(e, fallbackMessage: 'Could not load courses and streams. Please try again.')), backgroundColor: AppTheme.error),
         );
       }
     }
@@ -151,7 +152,7 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save preferences: $e'), backgroundColor: AppTheme.error),
+        SnackBar(content: Text(friendlyErrorMessage(e, fallbackMessage: 'Could not save your preferences. Please try again.')), backgroundColor: AppTheme.error),
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);

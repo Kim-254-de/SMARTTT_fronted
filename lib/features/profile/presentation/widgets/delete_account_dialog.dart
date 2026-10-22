@@ -5,6 +5,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/locale_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/widgets/auth_text_field.dart';
+import '../../../../core/network/error_message.dart';
 
 /// Shows the delete-account confirmation flow: a warning dialog, then a
 /// password-confirmation step, then calls the delete endpoint. Returns
@@ -107,7 +108,7 @@ class _PasswordConfirmDialogState extends ConsumerState<_PasswordConfirmDialog> 
       await ref.read(authProvider.notifier).deleteAccount(password);
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
-      final msg = e.toString().startsWith('Exception: ') ? e.toString().substring(11) : e.toString();
+      final msg = friendlyErrorMessage(e, fallbackMessage: 'Could not delete your account. Please try again.');
       if (mounted) {
         setState(() {
           _isSubmitting = false;

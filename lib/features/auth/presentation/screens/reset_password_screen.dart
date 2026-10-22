@@ -8,6 +8,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../widgets/premium_button.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_text_field.dart';
+import '../../../../core/network/error_message.dart';
 
 /// Landing page for the password reset link sent by email
 /// (`/reset-password?token=…`).
@@ -75,12 +76,11 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       if (mounted) setState(() => _stage = _ResetStage.success);
     } catch (error) {
       if (!mounted) return;
-      final message = error.toString().replaceFirst('Exception: ', '');
-      final lower = message.toLowerCase();
-      if (lower.contains('invalid') || lower.contains('expired') || lower.contains('token')) {
+      final raw = error.toString().toLowerCase();
+      if (raw.contains('invalid') || raw.contains('expired') || raw.contains('token')) {
         setState(() => _stage = _ResetStage.invalidLink);
       } else {
-        setState(() => _error = message);
+        setState(() => _error = friendlyErrorMessage(error, fallbackMessage: 'Could not reset your password. Please try again.'));
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);

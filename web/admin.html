@@ -291,6 +291,34 @@
       <div id="staffEmpty" class="empty-state hidden">No staff IDs uploaded yet.</div>
     </div>
 
+    <!-- Venue capacities card -->
+    <div class="card">
+      <h2>Venue capacities</h2>
+      <p style="color:var(--text-secondary);font-size:13px;margin-bottom:14px;">
+        Upload a <strong>.csv</strong> or <strong>.xlsx</strong> listing each venue and how many students it holds.
+        Lecturers changing venue are only allowed rooms big enough for their class.
+        Required columns: <code style="background:var(--surface-2);padding:2px 6px;border-radius:4px;">code</code> (or Room / Venue) and
+        <code style="background:var(--surface-2);padding:2px 6px;border-radius:4px;">capacity</code> (or Seats).
+        Optional: name, building, floor, type, status. Existing rooms are matched by code and updated.
+      </p>
+      <div id="roomUploadStatus"></div>
+      <input type="file" id="roomFileInput" accept=".csv,.xlsx">
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button onclick="uploadRoomCapacities()" id="roomUploadBtn">Upload Capacities</button>
+        <button class="secondary" onclick="downloadRoomTemplate()">Download template</button>
+      </div>
+      <div id="roomUploadErrors" class="errors-box hidden"></div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <strong style="font-size:13px;">Capacity coverage</strong>
+        <button class="secondary small" onclick="loadRoomCapacitySummary()">Refresh</button>
+      </div>
+      <div id="roomSummaryStatus"></div>
+      <div id="roomSummary" class="muted" style="font-size:13px;"></div>
+    </div>
+
     <!-- Uploads history card -->
     <div class="card">
       <h2>Upload history</h2>
@@ -339,30 +367,74 @@ function showStatus(elId, message, type) {
     el.innerHTML = '';
     return;
   }
-  el.innerHTML = `<div class="status-msg status-${type}">${message}</div>`;
+  // A browser/JS failure (e.g. "Cannot read properties of undefined") is a bug,
+  // not something the admin can act on.
+  if (type === 'error' && (JS_RUNTIME_TEXT.test(message) || !isUserFacing(message))) {
+    message = 'Something went wrong. Please refresh the page and try again.';
+  }
+  const box = document.createElement('div');
+  box.className = `status-msg status-${type}`;
+  box.textContent = message;
+  el.replaceChildren(box);
   if (type === 'success') setTimeout(() => { el.innerHTML = ''; }, 5000);
 }
 
-function parseErrorMessage(data) {
-  if (!data) return 'An unexpected error occurred.';
-  if (typeof data === 'string') return data;
-  if (data.detail) return data.detail;
-  if (data.message) return data.message;
-  if (data.error) {
-    if (typeof data.error === 'string') return data.error;
-    if (data.error.message) return data.error.message;
+const DEVELOPER_TEXT = /exception|traceback|stack ?trace|\bpk\b|uuid|object does not exist|<[a-z!\/]/i;
+const JS_RUNTIME_TEXT = /cannot read propert|is not a function|is not defined|is not iterable|unexpected token|json\.parse|failed to fetch|networkerror|load failed|undefined|null\b|\[object /i;
+
+function isUserFacing(text) {
+  return typeof text === 'string' && text.trim() !== '' && text.length <= 200 && !DEVELOPER_TEXT.test(text);
+}
+
+function firstText(value) {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (Array.isArray(value) && value.length) return firstText(value[0]);
+  if (value && typeof value === 'object') return firstText(Object.values(value)[0]);
+  return null;
+}
+
+function sentence(text) {
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+}
+
+function fieldLabel(key) {
+  return sentence(String(key).replace(/_/g, ' ').trim()) || 'This field';
+}
+
+// Picks the most relevant user-facing message from a DRF error body.
+function extractServerMessage(data) {
+  if (!data) return null;
+  if (typeof data === 'string') return data.trim() || null;
+  for (const key of ['detail', 'message', 'error', 'non_field_errors']) {
+    const text = firstText(data[key]);
+    if (text) return sentence(text);
   }
-  if (data.details && typeof data.details === 'object') {
-    const firstKey = Object.keys(data.details)[0];
-    const val = data.details[firstKey];
-    return Array.isArray(val) ? `${firstKey}: ${val[0]}` : `${firstKey}: ${val}`;
+  const source = data.details && typeof data.details === 'object' ? data.details : data;
+  for (const [key, value] of Object.entries(source)) {
+    const text = firstText(value);
+    if (!text) continue;
+    return /^(this field|ensure this field|this value)/i.test(text)
+      ? `${fieldLabel(key)}: ${sentence(text)}`
+      : sentence(text);
   }
-  const keys = Object.keys(data);
-  if (keys.length > 0) {
-    const val = data[keys[0]];
-    return Array.isArray(val) ? `${keys[0]}: ${val[0]}` : `${keys[0]}: ${val}`;
+  return null;
+}
+
+// Turns a failed response into a short message an admin can act on.
+function parseErrorMessage(data, status) {
+  if (status >= 500) return 'The server is having a problem right now. Please try again in a few minutes.';
+  const serverMessage = extractServerMessage(data);
+  if (isUserFacing(serverMessage)) return serverMessage;
+  switch (status) {
+    case 400: return 'Some of the information you entered is not valid. Please check it and try again.';
+    case 401: return 'The email or password you entered is incorrect.';
+    case 403: return 'You do not have permission to do this.';
+    case 404: return 'We could not find that item. It may have been removed; refresh the page.';
+    case 409: return 'This clashes with existing information. Please review it and try again.';
+    case 413: return 'The file is too large to upload.';
+    case 429: return 'Too many attempts. Please wait a moment and try again.';
   }
-  return 'Request failed. Please check the console.';
+  return 'Something went wrong. Please try again.';
 }
 
 async function apiFetch(path, options = {}) {
@@ -373,7 +445,12 @@ async function apiFetch(path, options = {}) {
     headers['Content-Type'] = 'application/json';
   }
   
-  const res = await fetch(API_BASE + path, { ...options, headers });
+  let res;
+  try {
+    res = await fetch(API_BASE + path, { ...options, headers });
+  } catch (_) {
+    throw new Error('Unable to reach the server. Please check your internet connection and try again.');
+  }
   
   if (res.status === 401 && !path.includes('login')) {
     clearToken();
@@ -383,7 +460,7 @@ async function apiFetch(path, options = {}) {
   
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(parseErrorMessage(data));
+    throw new Error(parseErrorMessage(data, res.status));
   }
   return data;
 }
@@ -497,14 +574,14 @@ async function uploadTimetable() {
           clearInterval(uploadPollTimer);
           btn.disabled = false;
           progress.classList.add('hidden');
-          showStatus('uploadStatus', 'Upload processing failed. Check server logs.', 'error');
+          showStatus('uploadStatus', 'We could not read this timetable file. Check that it is the correct timetable document and upload it again.', 'error');
           loadUploads();
         }
       } catch (err) {
         clearInterval(uploadPollTimer);
         btn.disabled = false;
         progress.classList.add('hidden');
-        showStatus('uploadStatus', `Monitoring error: ${err.message}`, 'error');
+        showStatus('uploadStatus', 'The file was uploaded, but we lost track of its progress. Refresh the page to see its status.', 'error');
       }
     }, 2500);
 
@@ -703,6 +780,7 @@ function loadAll() {
   loadPrograms();
   loadNotificationHistory();
   loadStaffIDs();
+  loadRoomCapacitySummary();
 }
 
 if (getToken()) {
@@ -873,6 +951,88 @@ async function loadStaffIDs() {
     `).join('');
   } catch (err) {
     showStatus('staffListStatus', err.message, 'error');
+  }
+}
+
+// ───────────────── Venue capacities ─────────────────
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function downloadRoomTemplate() {
+  const csv = 'code,name,building,floor,capacity,type,status\nLH1,Lecture Hall 1,Main Block,Ground,120,lecture hall,active\nLAB2,Computer Lab 2,Science Block,1,40,lab,active\n';
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  link.download = 'venue_capacities_template.csv';
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+async function uploadRoomCapacities() {
+  const fileInput = document.getElementById('roomFileInput');
+  const file = fileInput.files[0];
+  const errorsBox = document.getElementById('roomUploadErrors');
+  if (!file) {
+    showStatus('roomUploadStatus', 'Choose a .csv or .xlsx file first.', 'error');
+    return;
+  }
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext !== 'csv' && ext !== 'xlsx') {
+    showStatus('roomUploadStatus', 'Only .csv and .xlsx files are accepted.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('roomUploadBtn');
+  btn.disabled = true;
+  btn.textContent = 'Uploading…';
+  errorsBox.classList.add('hidden');
+
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const data = await apiFetch('rooms/rooms/upload/', { method: 'POST', body: formData });
+
+    const issues = data.errors || [];
+    showStatus('roomUploadStatus', data.detail || 'Capacities uploaded.', issues.length ? 'warning' : 'success');
+    if (issues.length) {
+      errorsBox.innerHTML = issues.map(e =>
+        `<div>Row ${e.row}${e.code ? ` (${escapeHtml(e.code)})` : ''}: ${escapeHtml(e.error)}</div>`
+      ).join('');
+      errorsBox.classList.remove('hidden');
+    }
+    if (data.summary) renderRoomSummary(data.summary);
+    fileInput.value = '';
+  } catch (err) {
+    showStatus('roomUploadStatus', err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Upload Capacities';
+  }
+}
+
+function renderRoomSummary(summary) {
+  const el = document.getElementById('roomSummary');
+  if (!summary.total) {
+    el.innerHTML = 'No venues yet. Upload a capacities file or a master timetable.';
+    return;
+  }
+  const badge = summary.unconfirmed
+    ? `<span class="badge badge-warning">${summary.unconfirmed} missing</span>`
+    : '<span class="badge badge-success">All set</span>';
+  let html = `${summary.confirmed} of ${summary.total} venue(s) have a confirmed capacity ${badge}`;
+  if (summary.unconfirmed) {
+    html += `<div style="margin-top:8px;">Still using a placeholder capacity (add these to your file):</div>
+      <div style="margin-top:6px;max-height:160px;overflow-y:auto;color:var(--text-primary);">${summary.unconfirmed_codes.map(escapeHtml).join(', ')}</div>`;
+  }
+  el.innerHTML = html;
+}
+
+async function loadRoomCapacitySummary() {
+  try {
+    renderRoomSummary(await apiFetch('rooms/rooms/capacity-summary/'));
+  } catch (err) {
+    showStatus('roomSummaryStatus', err.message, 'error');
   }
 }
 </script>

@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../domain/models/timetable_session_model.dart';
 import 'providers/timetable_provider.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/network/error_message.dart';
 
 class ScheduleScreen extends ConsumerStatefulWidget {
   const ScheduleScreen({Key? key}) : super(key: key);
@@ -53,7 +54,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open calendar subscription: $e'), backgroundColor: AppTheme.error),
+        SnackBar(content: Text(friendlyErrorMessage(e, fallbackMessage: 'Could not open the calendar subscription. Please try again.')), backgroundColor: AppTheme.error),
       );
     }
   }
@@ -189,15 +190,13 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
               )
             else if (state.error != null && state.sessions.isEmpty) ...[
               () {
-                final isAuth = state.error!.contains('401') || state.error!.toLowerCase().contains('unauthorized');
+                final isAuth = state.error!.toLowerCase().contains('session has expired');
                 return _EmptyState(
                   icon: isAuth ? Icons.lock_clock_outlined : Icons.error_outline,
                   title: isAuth ? 'Session Expired' : 'Failed to load timetable',
                   message: isAuth
                       ? 'Your session has expired. Please log in again to view your schedule.'
-                      : (state.error!.contains('connection')
-                          ? 'Unable to connect to server. Check your network connection.'
-                          : 'Something went wrong while fetching your schedule.'),
+                      : state.error!,
                   actionLabel: isAuth ? 'Log In' : 'Retry',
                   onAction: () {
                     if (isAuth) {

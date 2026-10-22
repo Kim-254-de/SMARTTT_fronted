@@ -10,6 +10,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../auth/domain/models/user_model.dart';
 import '../providers/auth_provider.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../../../../core/network/error_message.dart';
  
 class SocialAuthButtons extends ConsumerStatefulWidget {
   const SocialAuthButtons({super.key});
@@ -50,7 +51,7 @@ Future<void> _handleGoogleSignIn() async {
 
     // Get Firebase ID token for our Django backend
     final idToken = await userCredential.user?.getIdToken();
-    if (idToken == null) throw Exception('Could not get ID token from Google.');
+    if (idToken == null) throw Exception('Google sign-in failed. Please try again.');
 
     // Send to Django — get our own JWT back
     final response = await apiClient.dio.post(
@@ -68,9 +69,22 @@ Future<void> _handleGoogleSignIn() async {
     ref.read(authProvider.notifier).setUserFromGoogle(user);
 
     if (mounted) context.go('/home');
+  } on FirebaseAuthException catch (e) {
+    // Closing the Google popup is a normal choice, not an error.
+    if (e.code == 'popup-closed-by-user' || e.code == 'cancelled-popup-request') return;
+    if (mounted) {
+      final msg = e.code == 'popup-blocked'
+          ? 'Your browser blocked the Google sign-in window. Allow pop-ups for this site and try again.'
+          : e.code == 'network-request-failed'
+              ? 'Unable to reach Google. Please check your internet connection and try again.'
+              : 'Google sign-in failed. Please try again.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: AppTheme.error),
+      );
+    }
   } catch (e) {
     if (mounted) {
-      final msg = e.toString().replaceFirst('Exception: ', '');
+      final msg = friendlyErrorMessage(e, fallbackMessage: 'Google sign-in failed. Please try again.');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg), backgroundColor: AppTheme.error),
       );
@@ -89,12 +103,47 @@ Future<void> _handleGoogleSignIn() async {
               child: CircularProgressIndicator(),
             ),
           )
-        : _SocialButton(
-            icon: Icons.g_mobiledata,
-            label: 'Continue with Google',
-            onTap: _handleGoogleSignIn,
+        : Column(
+            children: [
+              _SocialButton(
+                icon: Icons.g_mobiledata,
+                label: 'Continue with Google',
+                onTap: _handleGoogleSignIn,
+              ),
+              const SizedBox(height: 12),
+              // Google can create a new account, which skips the sign-up checkboxes.
+              Wrap(
+                alignment: WrapAlignment.center,
+                children: [
+                  _consentText(context, 'By continuing with Google you agree to our '),
+                  _consentLink(context, 'Terms & Conditions', 'terms'),
+                  _consentText(context, ' and '),
+                  _consentLink(context, 'Privacy Policy', 'privacy'),
+                  _consentText(context, '.'),
+                ],
+              ),
+            ],
           );
   }
+
+  Widget _consentText(BuildContext context, String text) => Text(
+        text,
+        style: TextStyle(color: AppTheme.getTextSecondary(context), fontSize: 12),
+      );
+
+  Widget _consentLink(BuildContext context, String text, String routeName) => InkWell(
+        onTap: () => context.pushNamed(routeName),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: AppTheme.primary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            decoration: TextDecoration.underline,
+            decorationColor: AppTheme.primary,
+          ),
+        ),
+      );
 }
  
 class _SocialButton extends StatelessWidget {

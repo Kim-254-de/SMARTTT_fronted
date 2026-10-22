@@ -1,5 +1,5 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/network/error_message.dart';
 import '../../data/auth_repository.dart';
 import '../../domain/models/department_model.dart';
 import '../../domain/models/user_model.dart';
@@ -26,19 +26,7 @@ class AuthState {
   }
 }
 
-String _extractErrorMessage(Object e) {
-  if (e is DioException) {
-    final data = e.response?.data;
-    if (data is Map) {
-      return data['detail']?.toString() ??
-          data['message']?.toString() ??
-          data.values.first.toString();
-    }
-    return e.message ?? 'Network error. Please try again.';
-  }
-  final msg = e.toString();
-  return msg.startsWith('Exception: ') ? msg.substring(11) : msg;
-}
+String _extractErrorMessage(Object e) => friendlyErrorMessage(e);
 
 class AuthNotifier extends Notifier<AuthState> {
   @override
