@@ -100,9 +100,6 @@ class AuthRepository {
     }
   }
 
-  /// NOTE: Password reset is not yet implemented on the backend.
-  /// This will throw a 404 until that endpoint is added.
-
   Future<void> forgotPassword(String email) async {
     try {
       await apiClient.dio.post('auth/password/reset/', data: {'email': email});

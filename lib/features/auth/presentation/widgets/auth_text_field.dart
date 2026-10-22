@@ -8,6 +8,11 @@ class AuthTextField extends StatefulWidget {
   final bool isPassword;
   final TextEditingController? controller;
   final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final Iterable<String>? autofillHints;
+  final bool enabled;
 
   const AuthTextField({
     super.key,
@@ -16,6 +21,11 @@ class AuthTextField extends StatefulWidget {
     this.isPassword = false,
     this.controller,
     this.keyboardType,
+    this.textInputAction,
+    this.onChanged,
+    this.onSubmitted,
+    this.autofillHints,
+    this.enabled = true,
   });
 
   @override
@@ -46,6 +56,11 @@ class _AuthTextFieldState extends State<AuthTextField> {
       child: TextField(
         controller: widget.controller,
         keyboardType: widget.keyboardType,
+        textInputAction: widget.textInputAction,
+        onChanged: widget.onChanged,
+        onSubmitted: widget.onSubmitted,
+        autofillHints: widget.autofillHints,
+        enabled: widget.enabled,
         obscureText: widget.isPassword ? _obscureText : false,
         style: TextStyle(color: textColor),
         cursorColor: theme.colorScheme.primary,

@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'core/bootstrap/app_bootstrap_provider.dart';
 import 'core/bootstrap/splash_screen.dart';
 import 'core/theme/app_theme.dart';
@@ -13,6 +14,9 @@ import 'firebase_options.dart';
 import 'features/notifications/services/fcm_service.dart';
  
 void main() async {
+  // Path URLs (/reset-password?token=…) instead of hash URLs (/#/…) so links
+  // sent by email open the right screen on web. No-op on mobile.
+  usePathUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await FCMService.initialize();
