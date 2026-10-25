@@ -12,6 +12,10 @@ import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../schedule/presentation/providers/timetable_provider.dart';
 import '../../../schedule/domain/models/timetable_session_model.dart';
 import '../../../notifications/providers/notification_provider.dart';
+import '../../../exams/domain/exam_models.dart';
+import '../../../exams/presentation/providers/exam_provider.dart';
+import '../../../exams/presentation/student_exams_screen.dart';
+import '../../../exams/presentation/widgets/exam_widgets.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -33,8 +37,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   List<Widget> get _screens => [
-    _HomeTab(onViewSchedule: () => _onItemTapped(1)),
+    _HomeTab(onViewSchedule: () => _onItemTapped(1), onViewExams: () => _onItemTapped(2)),
     const ScheduleScreen(),
+    const StudentExamsScreen(),
     const ProfileScreen(),
   ];
 
@@ -48,7 +53,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
-      floatingActionButton: _selectedIndex == 2
+      // Sync is for the teaching timetable: not on Exams or Profile.
+      floatingActionButton: _selectedIndex >= 2
           ? null
           : FloatingActionButton.extended(
                   onPressed: () => context.push('/student-preferences'),
@@ -74,6 +80,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             icon: Icon(Iconsax.calendar),
             label: 'Schedule',
           ),
+          BottomNavigationBarItem(icon: Icon(Iconsax.edit), label: 'Exams'),
           BottomNavigationBarItem(
             icon: Icon(Iconsax.profile_circle),
             label: 'Profile',
@@ -86,8 +93,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
 class _HomeTab extends ConsumerWidget {
   final VoidCallback onViewSchedule;
+  final VoidCallback onViewExams;
 
-  const _HomeTab({required this.onViewSchedule});
+  const _HomeTab({required this.onViewSchedule, required this.onViewExams});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -241,6 +249,7 @@ class _HomeTab extends ConsumerWidget {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
+          ref.invalidate(studentExamsProvider);
           await ref.read(timetableProvider.notifier).fetchMySchedule();
         },
         child: SingleChildScrollView(
@@ -276,6 +285,7 @@ class _HomeTab extends ConsumerWidget {
                   ),
                 ),
               ],
+              _NextExamCard(onViewExams: onViewExams),
               // Quick Stats Row
               Row(
                 children: [
@@ -498,5 +508,54 @@ class _HomeTab extends ConsumerWidget {
         );
       }),
     ).animate().fadeIn(delay: 200.ms).moveY(begin: 20);
+  }
+}
+
+/// While exams are on (or the exam timetable is out), the student's next
+/// paper and room, with a link to the Exams tab.
+class _NextExamCard extends ConsumerWidget {
+  final VoidCallback onViewExams;
+
+  const _NextExamCard({required this.onViewExams});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final data = ref.watch(studentExamsProvider).asData?.value;
+    if (data == null || !data.published) return const SizedBox.shrink();
+    final now = DateTime.now();
+    final upcoming = data.papers.where((p) => p.endsAt.isAfter(now)).toList()
+      ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+    final ExamPaper? next = upcoming.isEmpty ? null : upcoming.first;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ExamModeBanner(term: data.term, published: data.published),
+        if (next != null) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Next exam',
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              TextButton(
+                onPressed: onViewExams,
+                child: const Text('All exams', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ExamCard(
+            codes: next.codes,
+            title: '${examDayLabel(next.date)}${next.title.isEmpty ? '' : ' · ${next.title}'}',
+            timeRange: next.timeRange,
+            where: examWhere(next.room, next.building),
+            startsAt: next.startsAt,
+            endsAt: next.endsAt,
+          ),
+          const SizedBox(height: 16),
+        ],
+      ],
+    ).animate().fadeIn();
   }
 }

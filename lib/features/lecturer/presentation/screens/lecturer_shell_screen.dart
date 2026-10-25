@@ -7,6 +7,7 @@ import 'lecturer_home_tab.dart';
 import 'lecturer_schedule_tab.dart';
 import 'lecturer_notification_tab.dart'; // 1. Import the notification broadcast tab
 import 'lecturer_profile_tab.dart';
+import '../../../exams/presentation/lecturer_exams_tab.dart';
 
 /// Route target for /lecturer/home — a single screen that owns bottom-nav
 /// state and switches between the lecturer tabs, exactly like the
@@ -31,6 +32,7 @@ class _LecturerShellScreenState extends ConsumerState<LecturerShellScreen> {
   final _tabs = const [
     LecturerHomeTab(),
     LecturerScheduleTab(),
+    LecturerExamsTab(),
     LecturerNotificationTab(),
     LecturerProfileTab(),
   ];
@@ -50,6 +52,7 @@ class _LecturerShellScreenState extends ConsumerState<LecturerShellScreen> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Iconsax.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Iconsax.calendar), label: 'Schedule'),
+          BottomNavigationBarItem(icon: Icon(Iconsax.edit), label: 'Exams'),
           BottomNavigationBarItem(icon: Icon(Iconsax.notification), label: 'Broadcast'), // 3. Add Broadcast item here
           BottomNavigationBarItem(icon: Icon(Iconsax.profile_circle), label: 'Profile'),
         ],
