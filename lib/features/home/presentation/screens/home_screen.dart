@@ -8,6 +8,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../widgets/timetable_card.dart';
 import '../widgets/stats_card.dart';
 import '../../../schedule/presentation/schedule_screen.dart';
+import '../../../exams/presentation/exams_screen.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../schedule/presentation/providers/timetable_provider.dart';
 import '../../../schedule/domain/models/timetable_session_model.dart';
@@ -35,6 +36,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   List<Widget> get _screens => [
     _HomeTab(onViewSchedule: () => _onItemTapped(1)),
     const ScheduleScreen(),
+    const ExamsScreen(),
     const ProfileScreen(),
   ];
 
@@ -48,7 +50,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
-      floatingActionButton: _selectedIndex == 2
+      floatingActionButton: _selectedIndex == 3
           ? null
           : FloatingActionButton.extended(
                   onPressed: () => context.push('/student-preferences'),
@@ -73,6 +75,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(Iconsax.calendar),
             label: 'Schedule',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Iconsax.task_square),
+            label: 'Exams',
           ),
           BottomNavigationBarItem(
             icon: Icon(Iconsax.profile_circle),
