@@ -167,7 +167,6 @@ class _LecturerScheduleTabState extends ConsumerState<LecturerScheduleTab> {
                 child: Text(
                   unitName,
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black87),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

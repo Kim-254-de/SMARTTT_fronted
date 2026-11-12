@@ -22,8 +22,6 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     _DayItem(label: 'Wed', keyName: 'WED'),
     _DayItem(label: 'Thu', keyName: 'THU'),
     _DayItem(label: 'Fri', keyName: 'FRI'),
-    _DayItem(label: 'Sat', keyName: 'SAT'),
-    _DayItem(label: 'Sun', keyName: 'SUN'),
   ];
 
   late int _selectedDayIndex;
@@ -31,7 +29,9 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedDayIndex = DateTime.now().weekday - 1;
+    // Classes run Monday to Friday; on a weekend open on Monday.
+    final weekday = DateTime.now().weekday;
+    _selectedDayIndex = weekday <= DateTime.friday ? weekday - 1 : 0;
     Future.microtask(() {
       ref.read(timetableProvider.notifier).fetchMySchedule();
     });
@@ -74,6 +74,11 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         centerTitle: true,
         actions: [
           IconButton(
+            icon: const Icon(Icons.calendar_month_outlined),
+            tooltip: 'Add to Calendar',
+            onPressed: subscribeCalendar,
+          ),
+          IconButton(
             icon: const Icon(Icons.groups_outlined),
             tooltip: 'Your Class Groups',
             onPressed: () => context.push('/select-groups'),
@@ -86,24 +91,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
           children: [
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: subscribeCalendar,
-                icon: const Icon(Icons.calendar_month),
-                label: const Text('Add to Calendar'),
-
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-            ),
-
+            _Summary(termLabel: state.termLabel, unitCount: state.unitCount, conflictCount: state.conflicts.length),
             const SizedBox(height: 16),
             if (state.unitsNeedingGroupSelection.isNotEmpty) ...[
               _GroupSelectionBanner(count: state.unitsNeedingGroupSelection.length),
@@ -113,21 +101,20 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
+                  color: AppTheme.getWarningSoft(context),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber.shade300),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.offline_bolt_outlined, size: 18, color: Colors.amber.shade900),
+                    Icon(Icons.offline_bolt_outlined, size: 18, color: AppTheme.getWarning(context)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Viewing saved timetable (Offline)',
+                        'Offline: showing your saved timetable',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: Colors.amber.shade900,
+                          color: AppTheme.getWarning(context),
                         ),
                       ),
                     ),
@@ -136,48 +123,37 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
               ),
               const SizedBox(height: 12),
             ],
-            if (state.termLabel != null) ...[
-              _InfoCard(
-                title: 'Current Sem',
-                value: state.termLabel!,
-                icon: Icons.school_outlined,
-              ),
-              const SizedBox(height: 12),
-            ],
+            // Five equal day buttons in one row, so they fit a small phone.
             Row(
-              children: [
-                Expanded(
-                  child: _InfoCard(
-                    title: 'Units',
-                    value: '${state.unitCount}',
-                    icon: Icons.book_outlined,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _InfoCard(
-                    title: 'Conflicts',
-                    value: '${state.conflicts.length}',
-                    icon: Icons.warning_amber_outlined,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
               children: List.generate(_days.length, (index) {
                 final day = _days[index];
                 final isSelected = index == _selectedDayIndex;
-                return ChoiceChip(
-                  label: Text(day.label),
-                  selected: isSelected,
-                  onSelected: (_) => setState(() => _selectedDayIndex = index),
-                  selectedColor: AppTheme.primary,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : AppTheme.getTextPrimary(context),
-                    fontWeight: FontWeight.w600,
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: index == _days.length - 1 ? 0 : 6),
+                    child: Material(
+                      color: isSelected ? AppTheme.primary : AppTheme.getSurface(context),
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => setState(() => _selectedDayIndex = index),
+                        child: Container(
+                          height: 44,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: isSelected ? null : Border.all(color: AppTheme.getBorder(context)),
+                          ),
+                          child: Text(
+                            day.label,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? Colors.white : AppTheme.getTextPrimary(context),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 );
               }),
@@ -251,9 +227,8 @@ class _GroupSelectionBanner extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: AppTheme.primary.withOpacity(0.08),
+          color: AppTheme.getBrandSoft(context),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
         ),
         child: Row(
           children: [
@@ -298,29 +273,29 @@ class _SessionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  session.unitTitle,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.getTextPrimary(context),
-                  ),
-                ),
+              Text(
+                '${session.startTime} - ${session.endTime}',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.primary),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  session.unitCode,
-                  style: const TextStyle(
-                    color: AppTheme.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+              const SizedBox(width: 8),
+              // The code can be long ("BITE 131/COSC 130"): it wraps rather than squeezing the title.
+              Flexible(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.getBrandSoft(context),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      session.unitCode,
+                      softWrap: true,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
               ),
@@ -328,22 +303,19 @@ class _SessionCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '${session.startTime} - ${session.endTime}',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppTheme.getTextSecondary(context),
-              fontWeight: FontWeight.w600,
-            ),
+            session.unitTitle,
+            softWrap: true,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.getTextPrimary(context)),
           ),
-          const SizedBox(height: 6),
-          Text(
-            session.lecturerName?.isNotEmpty == true ? session.lecturerName! : 'No lecturer assigned',
-            style: TextStyle(fontSize: 13, color: AppTheme.getTextSecondary(context)),
+          const SizedBox(height: 8),
+          _Detail(
+            icon: Icons.person_outline,
+            text: session.lecturerName?.isNotEmpty == true ? session.lecturerName! : 'No lecturer assigned',
           ),
           const SizedBox(height: 4),
-          Text(
-            session.roomCode?.isNotEmpty == true ? session.roomCode! : 'Room TBA',
-            style: TextStyle(fontSize: 13, color: AppTheme.getTextSecondary(context)),
+          _Detail(
+            icon: Icons.location_on_outlined,
+            text: session.roomCode?.isNotEmpty == true ? session.roomCode! : 'Room to be announced',
           ),
         ],
       ),
@@ -351,43 +323,59 @@ class _SessionCard extends StatelessWidget {
   }
 }
 
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({required this.title, required this.value, required this.icon});
+/// An icon and a line of text that wraps (never cut off) on a narrow phone.
+class _Detail extends StatelessWidget {
+  const _Detail({required this.icon, required this.text});
 
-  final String title;
-  final String value;
   final IconData icon;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.getSurface(context),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.getBorder(context)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppTheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: TextStyle(fontSize: 12, color: AppTheme.getTextSecondary(context))),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.getTextPrimary(context)),
-                ),
-              ],
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Icon(icon, size: 16, color: AppTheme.getTextSecondary(context)),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(text, softWrap: true, style: TextStyle(fontSize: 13, color: AppTheme.getTextSecondary(context))),
+        ),
+      ],
+    );
+  }
+}
+
+class _Summary extends StatelessWidget {
+  const _Summary({required this.termLabel, required this.unitCount, required this.conflictCount});
+
+  final String? termLabel;
+  final int unitCount;
+  final int conflictCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = TextStyle(fontSize: 13, color: AppTheme.getTextSecondary(context));
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (termLabel != null)
+          Text(termLabel!, softWrap: true, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.getTextPrimary(context))),
+        Text(unitCount == 1 ? '1 unit' : '$unitCount units', style: muted),
+        if (conflictCount > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(color: AppTheme.error.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
+            child: Text(
+              conflictCount == 1 ? '1 clash' : '$conflictCount clashes',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.error),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 }
