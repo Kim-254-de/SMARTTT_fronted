@@ -6,6 +6,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../notifications/providers/notification_provider.dart';
 import '../../notifications/domain/notification_model.dart';
+import '../../../widgets/theme_cycle_button.dart';
 
 class AlertsScreen extends ConsumerStatefulWidget {
   const AlertsScreen({super.key});
@@ -37,7 +38,8 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
           onPressed: () => context.pop(),
         ),
         title: const Text('Notifications'),
-        actions: [
+        actions: [const ThemeCycleButton(),
+            
           if (state.unreadCount > 0)
             TextButton(
               onPressed: () =>

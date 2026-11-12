@@ -7,6 +7,7 @@ import '../domain/models/timetable_session_model.dart';
 import 'providers/timetable_provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/network/error_message.dart';
+import '../../../widgets/theme_cycle_button.dart';
 
 class ScheduleScreen extends ConsumerStatefulWidget {
   const ScheduleScreen({Key? key}) : super(key: key);
@@ -72,7 +73,8 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         automaticallyImplyLeading: false,
         title: const Text('Class Schedule'),
         centerTitle: true,
-        actions: [
+        actions: [const ThemeCycleButton(),
+            
           IconButton(
             icon: const Icon(Icons.calendar_month_outlined),
             tooltip: 'Add to Calendar',

@@ -30,3 +30,10 @@ Files: `lib/features/schedule/presentation/schedule_screen.dart`, `lib/core/them
 `lib/features/home/presentation/widgets/timetable_card.dart`,
 `lib/features/lecturer/presentation/screens/lecturer_schedule_tab.dart`,
 `lib/features/schedule/presentation/student_preferences_screen.dart`.
+
+
+## Theme button everywhere (12 Nov 2026)
+
+The light / dark / system theme button was only in the signed-in headers (and, in
+the SMARTTT app, only on the Profile screens). It is now on every screen people land on:
+sign-in, Home, Class Schedule, Exams and Alerts (students) and the Schedule, Exams and Notifications tabs (lecturers), as well as both Profile screens as before (`widgets/theme_cycle_button.dart`).
