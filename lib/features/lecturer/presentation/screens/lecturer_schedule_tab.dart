@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/lecturer_dashboard_provider.dart';
 import '../widgets/lecturer_colors.dart';
+import '../../../../widgets/theme_cycle_button.dart';
 
 class LecturerScheduleTab extends ConsumerStatefulWidget {
   const LecturerScheduleTab({super.key});
@@ -31,6 +32,8 @@ class _LecturerScheduleTabState extends ConsumerState<LecturerScheduleTab> {
         backgroundColor: Colors.transparent,
         foregroundColor: isDarkMode ? Colors.white : Colors.black87,
         centerTitle: false,
+      
+        actions: const [ThemeCycleButton()],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -167,7 +170,6 @@ class _LecturerScheduleTabState extends ConsumerState<LecturerScheduleTab> {
                 child: Text(
                   unitName,
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.white : Colors.black87),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../domain/exam_models.dart';
 import 'providers/exam_provider.dart';
 import 'widgets/exam_widgets.dart';
+import '../../../widgets/theme_cycle_button.dart';
 
 /// The lecturer's exams: invigilation duties by day (the main invigilator
 /// collects the scripts from the other rooms), then the papers they set.
@@ -21,6 +22,8 @@ class LecturerExamsTab extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
+      
+        actions: const [ThemeCycleButton()],
       ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(lecturerExamsProvider.future),

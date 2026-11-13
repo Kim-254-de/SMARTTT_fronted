@@ -16,6 +16,7 @@ import '../../../exams/domain/exam_models.dart';
 import '../../../exams/presentation/providers/exam_provider.dart';
 import '../../../exams/presentation/student_exams_screen.dart';
 import '../../../exams/presentation/widgets/exam_widgets.dart';
+import '../../../../widgets/theme_cycle_button.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -203,7 +204,8 @@ class _HomeTab extends ConsumerWidget {
             ),
           ],
         ),
-        actions: [
+        actions: [const ThemeCycleButton(),
+            
           Consumer(
             builder: (context, ref, _) {
               final unread = ref.watch(notificationProvider).unreadCount;

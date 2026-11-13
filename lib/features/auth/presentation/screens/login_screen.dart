@@ -8,6 +8,7 @@ import '../../../../widgets/premium_button.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/social_auth_buttons.dart';
+import '../../../../widgets/theme_cycle_button.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -54,7 +55,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 60),
+              // Theme button on the sign-in screen too, as on every main screen.
+              const Align(alignment: Alignment.topRight, child: ThemeCycleButton()),
+              const SizedBox(height: 12),
               Center(
                 child: Container(
                   padding: const EdgeInsets.all(16),

@@ -111,7 +111,6 @@ class TimetableCard extends StatelessWidget {
                           child: Text(
                             instructor,
                             style: Theme.of(context).textTheme.bodyMedium,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -125,7 +124,6 @@ class TimetableCard extends StatelessWidget {
                         child: Text(
                           location,
                           style: Theme.of(context).textTheme.bodyMedium,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],

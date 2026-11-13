@@ -6,6 +6,7 @@ import '../../data/lecturer_repository.dart';
 import '../../../../core/network/api_client.dart';
 import '../widgets/lecturer_colors.dart';
 import '../../../../core/network/error_message.dart';
+import '../../../../widgets/theme_cycle_button.dart';
 
 class LecturerNotificationTab extends ConsumerStatefulWidget {
   const LecturerNotificationTab({super.key});
@@ -146,6 +147,8 @@ class _LecturerNotificationTabState extends ConsumerState<LecturerNotificationTa
         backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
         elevation: 0,
         foregroundColor: isDarkMode ? Colors.white : Colors.black87,
+      
+        actions: const [ThemeCycleButton()],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

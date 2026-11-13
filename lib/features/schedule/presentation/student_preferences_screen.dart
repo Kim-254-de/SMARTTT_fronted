@@ -191,7 +191,7 @@ class _StudentPreferencesScreenState extends ConsumerState<StudentPreferencesScr
                       ),
                       items: _courses.map((c) => DropdownMenuItem<String>(
                         value: c['id'].toString(),
-                        child: Text(c['name'], overflow: TextOverflow.ellipsis),
+                        child: Text(c['name'], softWrap: true),
                       )).toList(),
                       onChanged: (val) {
                         setState(() {

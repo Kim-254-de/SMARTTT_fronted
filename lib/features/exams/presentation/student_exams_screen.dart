@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../domain/exam_models.dart';
 import 'providers/exam_provider.dart';
 import 'widgets/exam_widgets.dart';
+import '../../../widgets/theme_cycle_button.dart';
 
 /// The student's exam timetable: each paper with the room they sit it in,
 /// by day, then the practicals. Before the switch it's a preview.
@@ -21,6 +22,8 @@ class StudentExamsScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
+      
+        actions: const [ThemeCycleButton()],
       ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(studentExamsProvider.future),

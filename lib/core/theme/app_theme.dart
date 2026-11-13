@@ -122,6 +122,15 @@ class AppTheme {
   static Color getTextSecondary(BuildContext context) => Theme.of(context).textTheme.bodyMedium!.color!;
   static Color getBorder(BuildContext context) => Theme.of(context).brightness == Brightness.light ? borderLight : borderDark;
 
+  // Warning (offline, needs attention): the same values as the web apps' --color-warning / --color-warning-soft.
+  static Color getWarning(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.light ? const Color(0xFFB45309) : const Color(0xFFFBBF24);
+  static Color getWarningSoft(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.light ? const Color(0xFFFFF4E0) : const Color(0xFF3A2E14);
+  // Brand-tinted background for chips and banners (web: --color-brand-soft).
+  static Color getBrandSoft(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.light ? const Color(0xFFE8EDF8) : const Color(0xFF22346B);
+
   // ── Static convenience constants (light theme defaults) ───────────────────
   static const Color background = bgLight;
   static const Color surface = surfaceLight;
